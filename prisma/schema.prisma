@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id           String         @id @default(uuid())
+  name         String
+  email        String
+  company      String
+  status       String         @default("NEW") // NEW, CONTACTED, REPLIED, INTERESTED, NOT_INTERESTED
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  campaignLeads CampaignLead[]
+}
+
+model Template {
+  id        String   @id @default(uuid())
+  name      String
+  subject   String
+  body      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SmtpConfig {
+  id            String   @id @default(uuid())
+  provider      String   // "gmail", "outlook", "custom"
+  host          String?
+  port          Int?
+  secure        Boolean  @default(true)
+  user          String
+  password      String   // Encrypted via AES-256-GCM
+  fromName      String
+  fromEmail     String
+  dailyLimit    Int      @default(50)
+  sentToday     Int      @default(0)
+  lastResetDate DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([lastResetDate])
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  name            String
+  templateId      String
+  status          String         @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  leads           CampaignLead[]
+  scheduleConfig  String?        // JSON: { delayMin: 120, delayMax: 600, dailyLimit: 50 }
+  lastProcessedAt DateTime?
+  isProcessing    Boolean        @default(false)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@index([status])
+}
+
+model CampaignLead {
+  id           String    @id @default(uuid())
+  campaignId   String
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  leadId       String
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  status       String    @default("QUEUED") // QUEUED, SENDING, SENT, FAILED, BOUNCED
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  errorMessage String?
+  retryCount   Int       @default(0)
+
+  @@unique([campaignId, leadId])
+  @@index([campaignId, status])
+  @@index([status])
+}
