@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma';
 // UUID validation regex (standard v4 format)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const leadId = req.nextUrl.searchParams.get('leadId');
 
