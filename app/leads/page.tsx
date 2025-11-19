@@ -1,8 +1,8 @@
 import prisma from "@/lib/prisma";
-import { deleteLead } from "@/app/actions";
 import Link from "next/link";
-import { Trash2, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { AddLeadDialog } from "@/components/AddLeadDialog";
+import { DeleteLeadButton } from "@/components/DeleteLeadButton";
 
 export default async function LeadsPage() {
     const leads = await prisma.lead.findMany({
@@ -53,11 +53,7 @@ export default async function LeadsPage() {
                                     >
                                         <Send className="h-4 w-4" /> Outreach
                                     </Link>
-                                    <form action={deleteLead.bind(null, lead.id)}>
-                                        <button type="submit" className="text-red-600 hover:text-red-900">
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
-                                    </form>
+                                    <DeleteLeadButton leadId={lead.id} />
                                 </td>
                             </tr>
                         ))}

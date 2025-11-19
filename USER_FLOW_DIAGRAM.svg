@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <!-- Definitions for markers -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8f9fa" />
+
+  <!-- Title -->
+  <text x="400" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">
+    User Flow: Error Handling & Email Sending
+  </text>
+
+  <!-- Swimlanes -->
+  <line x1="200" y1="60" x2="200" y2="580" stroke="#ccc" stroke-dasharray="5,5" />
+  <line x1="600" y1="60" x2="600" y2="580" stroke="#ccc" stroke-dasharray="5,5" />
+  
+  <text x="100" y="80" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Client (Browser)</text>
+  <text x="400" y="80" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Server Action (Next.js)</text>
+  <text x="700" y="80" text-anchor="middle" font-family="Arial" font-size="14" fill="#666">Database / SMTP</text>
+
+  <!-- Flow 1: Form Submission (Error Handling) -->
+  <rect x="40" y="120" width="120" height="50" rx="5" fill="#fff" stroke="#333" />
+  <text x="100" y="150" text-anchor="middle" font-family="Arial" font-size="12">User Submits Form</text>
+
+  <line x1="160" y1="145" x2="330" y2="145" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <rect x="340" y="120" width="120" height="50" rx="5" fill="#e3f2fd" stroke="#2196f3" />
+  <text x="400" y="140" text-anchor="middle" font-family="Arial" font-size="12">Validate Input</text>
+  <text x="400" y="155" text-anchor="middle" font-family="Arial" font-size="10">(Zod)</text>
+
+  <line x1="400" y1="170" x2="400" y2="200" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <polygon points="400,200 460,240 400,280 340,240" fill="#fff" stroke="#333" />
+  <text x="400" y="245" text-anchor="middle" font-family="Arial" font-size="12">Try / Catch</text>
+
+  <line x1="460" y1="240" x2="630" y2="240" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <rect x="640" y="215" width="120" height="50" rx="5" fill="#fff" stroke="#333" />
+  <text x="700" y="245" text-anchor="middle" font-family="Arial" font-size="12">DB Operation</text>
+
+  <!-- Success Path -->
+  <path d="M 640 250 Q 500 300 400 300" fill="none" stroke="#4caf50" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="550" y="290" font-family="Arial" font-size="10" fill="#4caf50">Success</text>
+
+  <!-- Error Path -->
+  <path d="M 700 265 Q 700 320 460 320" fill="none" stroke="#f44336" stroke-width="2" marker-end="url(#arrowhead)" />
+  <text x="600" y="330" font-family="Arial" font-size="10" fill="#f44336">DB Error (Throw)</text>
+
+  <rect x="340" y="300" width="120" height="50" rx="5" fill="#fff" stroke="#333" />
+  <text x="400" y="320" text-anchor="middle" font-family="Arial" font-size="12">Catch Error</text>
+  <text x="400" y="335" text-anchor="middle" font-family="Arial" font-size="10">Log & Format</text>
+
+  <line x1="340" y1="325" x2="170" y2="325" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <rect x="40" y="300" width="120" height="50" rx="5" fill="#fff" stroke="#333" />
+  <text x="100" y="330" text-anchor="middle" font-family="Arial" font-size="12">Show Error UI</text>
+
+  <!-- Flow 2: Email Rendering -->
+  <line x1="40" y1="400" x2="760" y2="400" stroke="#ccc" stroke-width="2" />
+  
+  <rect x="340" y="420" width="120" height="50" rx="5" fill="#fff" stroke="#333" />
+  <text x="400" y="440" text-anchor="middle" font-family="Arial" font-size="12">Prepare Email</text>
+  <text x="400" y="455" text-anchor="middle" font-family="Arial" font-size="10">(renderTemplate)</text>
+
+  <line x1="400" y1="470" x2="400" y2="500" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <rect x="340" y="500" width="120" height="50" rx="5" fill="#fff3e0" stroke="#ff9800" />
+  <text x="400" y="520" text-anchor="middle" font-family="Arial" font-size="12">Raw Text Replace</text>
+  <text x="400" y="535" text-anchor="middle" font-family="Arial" font-size="10">NO Escaping</text>
+
+  <line x1="460" y1="525" x2="630" y2="525" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)" />
+
+  <rect x="640" y="500" width="120" height="50" rx="5" fill="#fff" stroke="#333" />
+  <text x="700" y="525" text-anchor="middle" font-family="Arial" font-size="12">Send via SMTP</text>
+
+</svg>

@@ -20,6 +20,7 @@ export default defineConfig({
                 '.next/',
                 'vitest.config.ts',
                 '**/*.d.ts',
+                'e2e/',
             ],
         },
     },

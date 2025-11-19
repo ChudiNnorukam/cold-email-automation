@@ -58,8 +58,8 @@ describe('Email Template Rendering', () => {
     });
   });
 
-  describe('XSS Prevention in Templates', () => {
-    it('should escape HTML in name field', () => {
+  describe('Plain Text Content Fidelity', () => {
+    it('should preserve special characters in name field (no HTML escaping)', () => {
       const maliciousLead = {
         ...mockLead,
         name: '<script>alert("XSS")</script>',
@@ -68,11 +68,11 @@ describe('Email Template Rendering', () => {
       const template = 'Hello {{Name}}';
       const result = renderTemplate(template, maliciousLead);
 
-      expect(result).not.toContain('<script>');
-      expect(result).toContain('&lt;script&gt;');
+      // In plain text, this is safe. It should NOT be escaped.
+      expect(result).toBe('Hello <script>alert("XSS")</script>');
     });
 
-    it('should escape HTML in company field', () => {
+    it('should preserve special characters in company field', () => {
       const maliciousLead = {
         ...mockLead,
         company: '<img src=x onerror=alert("XSS")>',
@@ -81,11 +81,10 @@ describe('Email Template Rendering', () => {
       const template = 'Company: {{Company}}';
       const result = renderTemplate(template, maliciousLead);
 
-      expect(result).not.toContain('<img');
-      expect(result).toContain('&lt;img');
+      expect(result).toBe('Company: <img src=x onerror=alert("XSS")>');
     });
 
-    it('should escape ampersands', () => {
+    it('should preserve ampersands', () => {
       const lead = {
         ...mockLead,
         company: 'Smith & Jones',
@@ -94,10 +93,10 @@ describe('Email Template Rendering', () => {
       const template = '{{Company}}';
       const result = renderTemplate(template, lead);
 
-      expect(result).toBe('Smith &amp; Jones');
+      expect(result).toBe('Smith & Jones');
     });
 
-    it('should escape quotes', () => {
+    it('should preserve quotes', () => {
       const lead = {
         ...mockLead,
         name: 'John "The Boss" Doe',
@@ -106,10 +105,10 @@ describe('Email Template Rendering', () => {
       const template = '{{Name}}';
       const result = renderTemplate(template, lead);
 
-      expect(result).toBe('John &quot;The Boss&quot; Doe');
+      expect(result).toBe('John "The Boss" Doe');
     });
 
-    it('should escape single quotes', () => {
+    it('should preserve single quotes', () => {
       const lead = {
         ...mockLead,
         company: "O'Reilly Media",
@@ -118,10 +117,10 @@ describe('Email Template Rendering', () => {
       const template = '{{Company}}';
       const result = renderTemplate(template, lead);
 
-      expect(result).toBe('O&#x27;Reilly Media');
+      expect(result).toBe("O'Reilly Media");
     });
 
-    it('should escape forward slashes', () => {
+    it('should preserve forward slashes', () => {
       const lead = {
         ...mockLead,
         company: 'A/B Testing Co',
@@ -130,19 +129,7 @@ describe('Email Template Rendering', () => {
       const template = '{{Company}}';
       const result = renderTemplate(template, lead);
 
-      expect(result).toBe('A&#x2F;B Testing Co');
-    });
-
-    it('should handle multiple malicious characters', () => {
-      const lead = {
-        ...mockLead,
-        name: '<>"&\'/test',
-      };
-
-      const template = '{{Name}}';
-      const result = renderTemplate(template, lead);
-
-      expect(result).toBe('&lt;&gt;&quot;&amp;&#x27;&#x2F;test');
+      expect(result).toBe('A/B Testing Co');
     });
   });
 

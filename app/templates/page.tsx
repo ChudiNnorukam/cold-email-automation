@@ -1,7 +1,8 @@
 import prisma from "@/lib/prisma";
-import { deleteTemplate, seedTemplates } from "@/app/actions";
-import { Trash2, Sparkles } from "lucide-react";
+import { seedTemplates } from "@/app/actions";
+import { Sparkles } from "lucide-react";
 import { CreateTemplateForm } from "@/components/CreateTemplateForm";
+import { DeleteTemplateButton } from "@/components/DeleteTemplateButton";
 
 export default async function TemplatesPage() {
     const templates = await prisma.template.findMany({
@@ -32,11 +33,7 @@ export default async function TemplatesPage() {
                                 <h3 className="font-semibold text-gray-900">{template.name}</h3>
                                 <p className="text-sm text-gray-500">Subject: {template.subject}</p>
                             </div>
-                            <form action={deleteTemplate.bind(null, template.id)}>
-                                <button type="submit" className="text-gray-400 hover:text-red-600">
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            </form>
+                            <DeleteTemplateButton templateId={template.id} />
                         </div>
                         <div className="flex-1 bg-gray-50 p-4 rounded-md text-sm font-mono text-gray-700 whitespace-pre-wrap mb-4">
                             {template.body}

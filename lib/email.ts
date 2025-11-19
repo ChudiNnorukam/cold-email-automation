@@ -47,25 +47,53 @@ export async function createTransport(smtpConfig: SmtpConfig): Promise<Transport
  * Escape HTML special characters to prevent XSS attacks
  * Protects against malicious data in lead fields (name, company, email)
  */
-function escapeHtml(text: string): string {
-  const htmlEscapeMap: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#x27;',
-    '/': '&#x2F;',
-  };
-
-  return text.replace(/[&<>"'/]/g, (char) => htmlEscapeMap[char] || char);
-}
-
 export function renderTemplate(templateText: string, lead: Lead): string {
-  // Escape all user-provided data before inserting into template
+  // 1. Handle Name Edge Cases
+  let safeName = lead.name;
+  if (!safeName || safeName.toLowerCase().includes('unknown') || safeName.trim() === '') {
+    safeName = "there";
+  } else {
+    // Capitalize first letter just in case
+    safeName = safeName.charAt(0).toUpperCase() + safeName.slice(1);
+  }
+
+  // 2. Handle Company Edge Cases
+  let safeCompany = lead.company;
+  // Remove common suffixes
+  const suffixes = [', LLC', ' LLC', ', Inc.', ' Inc.', ', Inc', ' Inc', ' Ltd.', ' Ltd', ' Pty Ltd'];
+  for (const suffix of suffixes) {
+    if (safeCompany.endsWith(suffix)) {
+      safeCompany = safeCompany.slice(0, -suffix.length);
+    }
+  }
+  // Remove domain extensions if company name is a URL
+  if (safeCompany.includes('.') || safeCompany.includes('www')) {
+    // Remove protocol
+    safeCompany = safeCompany.replace(/(https?:\/\/)?(www\.)?/, '');
+
+    // Remove TLD (simple approach: take everything before the first dot, or last dot if multiple?)
+    // Better approach: split by dot, take first part unless it's common generic
+    const parts = safeCompany.split('.');
+    if (parts.length > 0) {
+      safeCompany = parts[0];
+    }
+
+    // Replace hyphens with spaces (e.g. "my-company" -> "my company")
+    safeCompany = safeCompany.replace(/-/g, ' ');
+  }
+  // Capitalize (Title Case)
+  safeCompany = safeCompany.split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
+  // 3. Handle City (if we had a city field, for now fallback)
+  const safeCity = "your area";
+
   return templateText
-    .replace(/\{\{Name\}\}/g, escapeHtml(lead.name))
-    .replace(/\{\{Company\}\}/g, escapeHtml(lead.company))
-    .replace(/\{\{Email\}\}/g, escapeHtml(lead.email));
+    .replace(/\{\{Name\}\}/g, safeName)
+    .replace(/\{\{Company\}\}/g, safeCompany)
+    .replace(/\[City\]/g, safeCity)
+    .replace(/\{\{Email\}\}/g, lead.email);
 }
 
 export async function sendEmail(

@@ -1,0 +1,105 @@
+[
+  {
+    "domain": "schmittheating.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [],
+    "needsRefresh": false
+  },
+  {
+    "domain": "galaxyservices.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [
+      "info@galaxyservices.com",
+      "flags@2x.webp",
+      "globe@2x.webp"
+    ],
+    "needsRefresh": false
+  },
+  {
+    "domain": "acheatingandair.net",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": false,
+    "emails": [
+      "acheatingandcoolingservice@gmail.com",
+      "abc@mail.com"
+    ],
+    "needsRefresh": true
+  },
+  {
+    "domain": "bigblueplumbingservice.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [
+      ""
+    ],
+    "needsRefresh": false
+  },
+  {
+    "domain": "magnificentplumbing.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [
+      "info@magnificentplumbing.com"
+    ],
+    "needsRefresh": false
+  },
+  {
+    "domain": "undergroundrooter.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [
+      "undergroundrooter21@gmail.com"
+    ],
+    "needsRefresh": false
+  },
+  {
+    "domain": "zandzplumbing.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": false,
+    "emails": [],
+    "needsRefresh": true
+  },
+  {
+    "domain": "lawrf.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [],
+    "needsRefresh": false
+  },
+  {
+    "domain": "sjdivorce.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [],
+    "needsRefresh": false
+  },
+  {
+    "domain": "fosterhsu.com",
+    "status": "Active",
+    "isMobileFriendly": true,
+    "isSecure": true,
+    "hasCurrentYear": true,
+    "emails": [],
+    "needsRefresh": false
+  }
+]

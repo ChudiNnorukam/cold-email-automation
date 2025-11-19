@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from "react";
-import { updateLeadStatus } from "@/app/actions";
-import { Copy, Mail, CheckCircle, ArrowLeft } from "lucide-react";
+import { updateLeadStatus, sendOneOffEmail } from "@/app/actions";
+import { Copy, Mail, CheckCircle, ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
 
 type Lead = {
@@ -139,9 +139,23 @@ export default function OutreachWorkbench({ lead, templates }: { lead: Lead; tem
                         </button>
                         <button
                             onClick={handleMailTo}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                             <Mail className="h-4 w-4" /> Open Mail App
+                        </button>
+                        <button
+                            onClick={async () => {
+                                if (!generatedSubject || !generatedBody) return;
+                                const result = await sendOneOffEmail(lead.id, generatedSubject, generatedBody);
+                                if (result.success) {
+                                    alert("Email sent successfully!");
+                                } else {
+                                    alert("Error: " + result.error);
+                                }
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                        >
+                            <Send className="h-4 w-4" /> Send Now
                         </button>
                     </div>
                 </div>

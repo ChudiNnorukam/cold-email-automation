@@ -4,7 +4,7 @@ import { rateLimit } from '@/lib/rate-limit';
 
 export async function GET(req: NextRequest) {
   // Apply rate limiting: 20 requests per 10 seconds per IP
-  const ip = req.ip || req.headers.get('x-forwarded-for') || 'unknown';
+  const ip = req.headers.get('x-forwarded-for') || 'unknown';
   const limitResult = rateLimit(ip, 20, 10000);
 
   if (!limitResult.success) {

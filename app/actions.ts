@@ -14,11 +14,11 @@ type CampaignStatus = typeof VALID_CAMPAIGN_STATUSES[number];
 type LeadStatus = typeof VALID_LEAD_STATUSES[number];
 
 function validateCampaignStatus(status: string): status is CampaignStatus {
-  return VALID_CAMPAIGN_STATUSES.includes(status as CampaignStatus);
+    return VALID_CAMPAIGN_STATUSES.includes(status as CampaignStatus);
 }
 
 function validateLeadStatus(status: string): status is LeadStatus {
-  return VALID_LEAD_STATUSES.includes(status as LeadStatus);
+    return VALID_LEAD_STATUSES.includes(status as LeadStatus);
 }
 
 const LeadSchema = z.object({
@@ -69,32 +69,50 @@ export async function createLead(formData: FormData) {
         return { error: "Validation failed" };
     }
 
-    await prisma.lead.create({
-        data: {
-            ...result.data,
-            status: "NEW",
-        },
-    });
+    try {
+        await prisma.lead.create({
+            data: {
+                ...result.data,
+                status: "NEW",
+            },
+        });
 
-    revalidatePath("/leads");
-    revalidatePath("/");
+        revalidatePath("/leads");
+        revalidatePath("/");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to create lead:", error);
+        return { error: "Failed to create lead. Please try again." };
+    }
 }
 
 export async function updateLeadStatus(leadId: string, status: string) {
-    // Simple validation for status enum could go here
-    await prisma.lead.update({
-        where: { id: leadId },
-        data: { status },
-    });
-    revalidatePath("/leads");
-    revalidatePath(`/outreach/${leadId}`);
+    try {
+        // Simple validation for status enum could go here
+        await prisma.lead.update({
+            where: { id: leadId },
+            data: { status },
+        });
+        revalidatePath("/leads");
+        revalidatePath(`/outreach/${leadId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update lead status:", error);
+        return { error: "Failed to update status." };
+    }
 }
 
 export async function deleteLead(leadId: string) {
-    await prisma.lead.delete({
-        where: { id: leadId },
-    });
-    revalidatePath("/leads");
+    try {
+        await prisma.lead.delete({
+            where: { id: leadId },
+        });
+        revalidatePath("/leads");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to delete lead:", error);
+        return { error: "Failed to delete lead." };
+    }
 }
 
 export async function createTemplate(formData: FormData) {
@@ -110,19 +128,31 @@ export async function createTemplate(formData: FormData) {
         return { error: "Validation failed" };
     }
 
-    await prisma.template.create({
-        data: result.data,
-    });
+    try {
+        await prisma.template.create({
+            data: result.data,
+        });
 
-    revalidatePath("/templates");
-    revalidatePath("/");
+        revalidatePath("/templates");
+        revalidatePath("/");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to create template:", error);
+        return { error: "Failed to create template." };
+    }
 }
 
 export async function deleteTemplate(templateId: string) {
-    await prisma.template.delete({
-        where: { id: templateId },
-    });
-    revalidatePath("/templates");
+    try {
+        await prisma.template.delete({
+            where: { id: templateId },
+        });
+        revalidatePath("/templates");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to delete template:", error);
+        return { error: "Failed to delete template." };
+    }
 }
 
 export async function seedTemplates() {
@@ -195,20 +225,25 @@ export async function createSmtpConfig(formData: FormData) {
     // Encrypt password before saving
     const encryptedPassword = encrypt(result.data.password);
 
-    // Delete existing config (single config app)
-    await prisma.smtpConfig.deleteMany({});
+    try {
+        // Delete existing config (single config app)
+        await prisma.smtpConfig.deleteMany({});
 
-    await prisma.smtpConfig.create({
-        data: {
-            ...result.data,
-            password: encryptedPassword,
-            host: result.data.host || null,
-            port: result.data.port || null,
-        },
-    });
+        await prisma.smtpConfig.create({
+            data: {
+                ...result.data,
+                password: encryptedPassword,
+                host: result.data.host || null,
+                port: result.data.port || null,
+            },
+        });
 
-    revalidatePath("/settings");
-    return { success: true };
+        revalidatePath("/settings");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to save SMTP config:", error);
+        return { error: "Failed to save SMTP configuration." };
+    }
 }
 
 export async function getSmtpConfig() {
@@ -254,43 +289,48 @@ export async function createCampaign(formData: FormData) {
         return { error: "Validation failed" };
     }
 
-    // Check SMTP exists
-    const smtp = await prisma.smtpConfig.findFirst();
-    if (!smtp) {
-        return { error: "Please configure SMTP settings first" };
-    }
+    try {
+        // Check SMTP exists
+        const smtp = await prisma.smtpConfig.findFirst();
+        if (!smtp) {
+            return { error: "Please configure SMTP settings first" };
+        }
 
-    // Check for duplicate emails
-    const leads = await prisma.lead.findMany({
-        where: { id: { in: result.data.leadIds } },
-    });
+        // Check for duplicate emails
+        const leads = await prisma.lead.findMany({
+            where: { id: { in: result.data.leadIds } },
+        });
 
-    const uniqueEmails = new Set(leads.map(l => l.email));
-    if (uniqueEmails.size !== leads.length) {
-        return { error: "Duplicate emails detected in selected leads" };
-    }
+        const uniqueEmails = new Set(leads.map(l => l.email));
+        if (uniqueEmails.size !== leads.length) {
+            return { error: "Duplicate emails detected in selected leads" };
+        }
 
-    // Create campaign with default schedule config
-    const campaign = await prisma.campaign.create({
-        data: {
-            name: result.data.name,
-            templateId: result.data.templateId,
-            scheduleConfig: JSON.stringify({
-                delayMin: 120, // 2 minutes
-                delayMax: 600, // 10 minutes
-                dailyLimit: 50,
-            }),
-            leads: {
-                create: result.data.leadIds.map(id => ({
-                    leadId: id,
-                    status: "QUEUED",
-                })),
+        // Create campaign with default schedule config
+        const campaign = await prisma.campaign.create({
+            data: {
+                name: result.data.name,
+                templateId: result.data.templateId,
+                scheduleConfig: JSON.stringify({
+                    delayMin: 120, // 2 minutes
+                    delayMax: 600, // 10 minutes
+                    dailyLimit: 50,
+                }),
+                leads: {
+                    create: result.data.leadIds.map(id => ({
+                        leadId: id,
+                        status: "QUEUED",
+                    })),
+                },
             },
-        },
-    });
+        });
 
-    revalidatePath("/campaigns");
-    return { success: true, id: campaign.id };
+        revalidatePath("/campaigns");
+        return { success: true, id: campaign.id };
+    } catch (error) {
+        console.error("Failed to create campaign:", error);
+        return { error: "Failed to create campaign." };
+    }
 }
 
 export async function updateCampaignStatus(campaignId: string, status: string) {
@@ -301,26 +341,36 @@ export async function updateCampaignStatus(campaignId: string, status: string) {
         };
     }
 
-    await prisma.campaign.update({
-        where: { id: campaignId },
-        data: {
-            status,
-            startedAt: status === "ACTIVE" ? new Date() : undefined,
-        },
-    });
+    try {
+        await prisma.campaign.update({
+            where: { id: campaignId },
+            data: {
+                status,
+                startedAt: status === "ACTIVE" ? new Date() : undefined,
+            },
+        });
 
-    revalidatePath(`/campaigns/${campaignId}`);
-    revalidatePath("/campaigns");
-    return { success: true };
+        revalidatePath(`/campaigns/${campaignId}`);
+        revalidatePath("/campaigns");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update campaign status:", error);
+        return { error: "Failed to update campaign status." };
+    }
 }
 
 export async function deleteCampaign(campaignId: string) {
-    await prisma.campaign.delete({
-        where: { id: campaignId },
-    });
+    try {
+        await prisma.campaign.delete({
+            where: { id: campaignId },
+        });
 
-    revalidatePath("/campaigns");
-    return { success: true };
+        revalidatePath("/campaigns");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to delete campaign:", error);
+        return { error: "Failed to delete campaign." };
+    }
 }
 
 export async function getCampaignProgress(campaignId: string) {
@@ -337,4 +387,35 @@ export async function getCampaignProgress(campaignId: string) {
     };
 
     return stats;
+}
+
+export async function sendOneOffEmail(leadId: string, subject: string, body: string) {
+    try {
+        const config = await prisma.smtpConfig.findFirst();
+        if (!config) {
+            return { error: "SMTP not configured" };
+        }
+
+        const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+        if (!lead) {
+            return { error: "Lead not found" };
+        }
+
+        // Import dynamically to avoid circular deps if any
+        const { sendEmail } = await import("@/lib/email");
+
+        await sendEmail(config as any, { subject, body }, lead);
+
+        await prisma.lead.update({
+            where: { id: leadId },
+            data: { status: "CONTACTED" }
+        });
+
+        revalidatePath("/leads");
+        revalidatePath(`/outreach/${leadId}`);
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to send email:", error);
+        return { error: "Failed to send email. Check server logs." };
+    }
 }
