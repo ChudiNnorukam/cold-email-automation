@@ -381,9 +381,9 @@ export async function getCampaignProgress(campaignId: string) {
 
     const stats = {
         total: leads.length,
-        queued: leads.filter(l => l.status === "QUEUED").length,
-        sent: leads.filter(l => l.status === "SENT").length,
-        failed: leads.filter(l => l.status === "FAILED").length,
+        queued: leads.filter((l: { status: string }) => l.status === "QUEUED").length,
+        sent: leads.filter((l: { status: string }) => l.status === "SENT").length,
+        failed: leads.filter((l: { status: string }) => l.status === "FAILED").length,
     };
 
     return stats;
