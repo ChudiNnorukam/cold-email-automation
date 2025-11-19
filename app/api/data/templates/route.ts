@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { rateLimit } from '@/lib/rate-limit';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   // Apply rate limiting: 20 requests per 10 seconds per IP
   const ip = req.headers.get('x-forwarded-for') || 'unknown';
