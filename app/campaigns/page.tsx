@@ -41,7 +41,7 @@ export default async function CampaignsPage() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {campaigns.map((campaign) => (
+          {campaigns.map((campaign: any) => (
             <div
               key={campaign.id}
               className="border rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -56,15 +56,14 @@ export default async function CampaignsPage() {
                   <div className="mt-2 flex gap-4 text-sm text-gray-600">
                     <span>{campaign._count.leads} leads</span>
                     <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        campaign.status === 'ACTIVE'
+                      className={`px-2 py-1 rounded text-xs font-semibold ${campaign.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-800'
                           : campaign.status === 'PAUSED'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : campaign.status === 'COMPLETED'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : campaign.status === 'COMPLETED'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-gray-100 text-gray-800'
+                        }`}
                     >
                       {campaign.status}
                     </span>
