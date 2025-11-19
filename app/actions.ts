@@ -6,6 +6,21 @@ import { z } from "zod";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { testConnection } from "@/lib/email";
 
+// Valid enum values from Prisma schema
+const VALID_CAMPAIGN_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'COMPLETED'] as const;
+const VALID_LEAD_STATUSES = ['QUEUED', 'SENT', 'OPENED', 'CLICKED', 'REPLIED', 'BOUNCED', 'FAILED', 'NOT_INTERESTED'] as const;
+
+type CampaignStatus = typeof VALID_CAMPAIGN_STATUSES[number];
+type LeadStatus = typeof VALID_LEAD_STATUSES[number];
+
+function validateCampaignStatus(status: string): status is CampaignStatus {
+  return VALID_CAMPAIGN_STATUSES.includes(status as CampaignStatus);
+}
+
+function validateLeadStatus(status: string): status is LeadStatus {
+  return VALID_LEAD_STATUSES.includes(status as LeadStatus);
+}
+
 const LeadSchema = z.object({
     name: z.string().min(1, "Name is required"),
     email: z.string().email("Invalid email address"),
@@ -279,6 +294,13 @@ export async function createCampaign(formData: FormData) {
 }
 
 export async function updateCampaignStatus(campaignId: string, status: string) {
+    // Validate status enum to prevent invalid values
+    if (!validateCampaignStatus(status)) {
+        return {
+            error: `Invalid campaign status. Must be one of: ${VALID_CAMPAIGN_STATUSES.join(', ')}`
+        };
+    }
+
     await prisma.campaign.update({
         where: { id: campaignId },
         data: {

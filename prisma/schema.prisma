@@ -17,6 +17,9 @@ model Lead {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   campaignLeads CampaignLead[]
+
+  @@index([email])  // Fast lookup for duplicate detection and unsubscribe
+  @@index([status]) // Filter by status (active leads, unsubscribed, etc.)
 }
 
 model Template {
@@ -76,6 +79,8 @@ model CampaignLead {
   retryCount   Int       @default(0)
 
   @@unique([campaignId, leadId])
-  @@index([campaignId, status])
-  @@index([status])
+  @@index([campaignId, status])  // Query leads for a campaign by status
+  @@index([status])              // Global status filtering
+  @@index([scheduledFor])        // Cron job queries for scheduled emails
+  @@index([sentAt])              // Analytics and reporting queries
 }

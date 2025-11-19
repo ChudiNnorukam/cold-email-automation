@@ -5,12 +5,23 @@ import path from 'path'
 export default defineConfig({
     plugins: [react()],
     test: {
-        environment: 'jsdom',
+        environment: 'node', // Use 'node' for server-side tests, 'jsdom' for React components
         globals: true,
-        setupFiles: [],
+        setupFiles: ['./test/setup.ts'],
         alias: {
             '@': path.resolve(__dirname, './')
-        }
+        },
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'json', 'html'],
+            exclude: [
+                'node_modules/',
+                'test/',
+                '.next/',
+                'vitest.config.ts',
+                '**/*.d.ts',
+            ],
+        },
     },
     resolve: {
         alias: {

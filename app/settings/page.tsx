@@ -104,7 +104,7 @@ export default function SettingsPage() {
 
         <input type="hidden" name="host" value={isGmail ? 'smtp.gmail.com' : isOutlook ? 'smtp.office365.com' : ''} />
         <input type="hidden" name="port" value={isGmail || isOutlook ? '587' : ''} />
-        <input type="hidden" name="secure" value="true" />
+        <input type="hidden" name="secure" value="false" />
 
         <div>
           <Label htmlFor="user">Email Address</Label>

@@ -3,14 +3,7 @@ import prisma from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 
 export async function GET(req: NextRequest) {
-  // Auth check (Vercel Cron Secret)
-  const authHeader = req.headers.get('authorization');
-  const expectedAuth = process.env.CRON_SECRET;
-
-  if (expectedAuth && authHeader !== `Bearer ${expectedAuth}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
+  // Auth is handled by middleware.ts - this endpoint is protected
   try {
     // Reset daily limits if needed
     await resetDailyLimits();
@@ -35,11 +28,20 @@ export async function GET(req: NextRequest) {
     const results = [];
 
     for (const campaign of campaigns) {
-      // Lock campaign
-      await prisma.campaign.update({
-        where: { id: campaign.id },
+      // Atomic lock acquisition - prevents race conditions between multiple cron instances
+      const lockResult = await prisma.campaign.updateMany({
+        where: {
+          id: campaign.id,
+          isProcessing: false // Only lock if not already processing
+        },
         data: { isProcessing: true },
       });
+
+      // If lockResult.count === 0, another instance is processing this campaign
+      if (lockResult.count === 0) {
+        console.log(`Campaign ${campaign.id} already being processed, skipping`);
+        continue;
+      }
 
       try {
         // Get next lead ready to send
@@ -77,17 +79,18 @@ export async function GET(req: NextRequest) {
 
         await sendEmailWithRetry(smtpConfig, template, campaignLead);
 
-        // Update status
-        await prisma.campaignLead.update({
-          where: { id: campaignLead.id },
-          data: { status: 'SENT', sentAt: new Date() },
-        });
-
-        // Increment daily counter
-        await prisma.smtpConfig.update({
-          where: { id: smtpConfig.id },
-          data: { sentToday: { increment: 1 } },
-        });
+        // Update status and increment counter in a transaction
+        // This ensures consistency - either both succeed or both fail
+        await prisma.$transaction([
+          prisma.campaignLead.update({
+            where: { id: campaignLead.id },
+            data: { status: 'SENT', sentAt: new Date() },
+          }),
+          prisma.smtpConfig.update({
+            where: { id: smtpConfig.id },
+            data: { sentToday: { increment: 1 } },
+          }),
+        ]);
 
         processed++;
 
