@@ -26,9 +26,9 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
 
   const stats = {
     total: campaign.leads.length,
-    sent: campaign.leads.filter((l) => l.status === 'SENT').length,
-    queued: campaign.leads.filter((l) => l.status === 'QUEUED').length,
-    failed: campaign.leads.filter((l) => l.status === 'FAILED').length,
+    sent: campaign.leads.filter((l: { status: string }) => l.status === 'SENT').length,
+    queued: campaign.leads.filter((l: { status: string }) => l.status === 'QUEUED').length,
+    failed: campaign.leads.filter((l: { status: string }) => l.status === 'FAILED').length,
   };
 
   const progress = stats.total > 0 ? (stats.sent / stats.total) * 100 : 0;
@@ -138,15 +138,14 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
                 <td className="px-4 py-3 text-sm">{cl.lead.company}</td>
                 <td className="px-4 py-3">
                   <span
-                    className={`px-2 py-1 rounded text-xs font-semibold ${
-                      cl.status === 'SENT'
+                    className={`px-2 py-1 rounded text-xs font-semibold ${cl.status === 'SENT'
                         ? 'bg-green-100 text-green-800'
                         : cl.status === 'QUEUED'
-                        ? 'bg-blue-100 text-blue-800'
-                        : cl.status === 'FAILED'
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
+                          ? 'bg-blue-100 text-blue-800'
+                          : cl.status === 'FAILED'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                      }`}
                   >
                     {cl.status}
                   </span>
