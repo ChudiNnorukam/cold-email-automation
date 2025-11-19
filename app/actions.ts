@@ -301,7 +301,7 @@ export async function createCampaign(formData: FormData) {
             where: { id: { in: result.data.leadIds } },
         });
 
-        const uniqueEmails = new Set(leads.map(l => l.email));
+        const uniqueEmails = new Set(leads.map((l: { email: string }) => l.email));
         if (uniqueEmails.size !== leads.length) {
             return { error: "Duplicate emails detected in selected leads" };
         }
