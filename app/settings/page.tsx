@@ -210,12 +210,13 @@ export default function SettingsPage() {
                 variant="outline"
                 onClick={async () => {
                   if (confirm('Run email sending job now?')) {
-                    const res = await fetch('/api/cron/trigger', {
-                      method: 'POST',
-                      body: JSON.stringify({ job: 'send-emails' })
-                    });
-                    const data = await res.json();
-                    alert(JSON.stringify(data, null, 2));
+                    const { runManualCron } = await import('@/app/actions');
+                    const result = await runManualCron('send-emails');
+                    if ((result as any).success) {
+                      alert('Processed ' + ((result as any).message || 'emails'));
+                    } else {
+                      alert('Error: ' + (result as any).error);
+                    }
                   }
                 }}
               >

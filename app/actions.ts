@@ -290,6 +290,25 @@ export async function toggleSystemPause(isPaused: boolean) {
     }
 }
 
+export async function runManualCron(job: 'send-emails' | 'find-leads') {
+    try {
+        const { processEmailQueue, findNewLeads } = await import('@/lib/cron-services');
+
+        if (job === 'send-emails') {
+            const result = await processEmailQueue();
+            return { success: true, ...result };
+        } else if (job === 'find-leads') {
+            const result = await findNewLeads();
+            return { success: true, ...result };
+        }
+
+        return { error: 'Invalid job name' };
+    } catch (error: any) {
+        console.error("Failed to run manual cron:", error);
+        return { error: error.message || "Failed to run cron job." };
+    }
+}
+
 // Campaign Actions
 export async function createCampaign(formData: FormData) {
     const leadIdsRaw = formData.get("leadIds")?.toString();
