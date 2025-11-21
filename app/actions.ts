@@ -272,6 +272,24 @@ export async function testSmtpConnection() {
     }
 }
 
+export async function toggleSystemPause(isPaused: boolean) {
+    try {
+        const config = await prisma.smtpConfig.findFirst();
+        if (!config) return { error: "SMTP not configured" };
+
+        await prisma.smtpConfig.update({
+            where: { id: config.id },
+            data: { isSystemPaused: isPaused }
+        });
+
+        revalidatePath("/settings");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to toggle system pause:", error);
+        return { error: "Failed to update system status." };
+    }
+}
+
 // Campaign Actions
 export async function createCampaign(formData: FormData) {
     const leadIdsRaw = formData.get("leadIds")?.toString();

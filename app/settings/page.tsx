@@ -196,6 +196,67 @@ export default function SettingsPage() {
           <li>Gmail requires App Passwords with 2FA enabled</li>
         </ul>
       </div>
+
+      {existingConfig && (
+        <div className="mt-8 border-t pt-8">
+          <h2 className="text-2xl font-bold mb-4">System Controls</h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="p-4 border rounded bg-gray-50">
+              <h3 className="font-semibold mb-2">Manual Trigger</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Run the email sending cron job immediately. Useful for testing.
+              </p>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  if (confirm('Run email sending job now?')) {
+                    const res = await fetch('/api/cron/trigger', {
+                      method: 'POST',
+                      body: JSON.stringify({ job: 'send-emails' })
+                    });
+                    const data = await res.json();
+                    alert(JSON.stringify(data, null, 2));
+                  }
+                }}
+              >
+                Run Email Sender
+              </Button>
+            </div>
+
+            <div className="p-4 border rounded bg-red-50 border-red-100">
+              <h3 className="font-semibold mb-2 text-red-900">Danger Zone</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-red-900">Kill Switch</p>
+                  <p className="text-sm text-red-700">
+                    Pause all email sending immediately.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">
+                    {existingConfig.isSystemPaused ? 'PAUSED' : 'ACTIVE'}
+                  </span>
+                  <Button
+                    variant={existingConfig.isSystemPaused ? "default" : "destructive"}
+                    onClick={async () => {
+                      const { toggleSystemPause } = await import('@/app/actions');
+                      const newState = !existingConfig.isSystemPaused;
+                      const result = await toggleSystemPause(newState);
+                      if (result.success) {
+                        setExistingConfig({ ...existingConfig, isSystemPaused: newState });
+                      } else {
+                        alert(result.error);
+                      }
+                    }}
+                  >
+                    {existingConfig.isSystemPaused ? 'Resume System' : 'PAUSE SYSTEM'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

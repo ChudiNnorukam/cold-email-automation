@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -30,6 +30,7 @@ model Template {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  steps     SequenceStep[]
 }
 
 model SmtpConfig {
@@ -45,6 +46,7 @@ model SmtpConfig {
   dailyLimit    Int      @default(50)
   sentToday     Int      @default(0)
   lastResetDate DateTime @default(now())
+  isSystemPaused Boolean  @default(false)
   createdAt     DateTime @default(now())
 
   @@index([lastResetDate])
@@ -53,10 +55,13 @@ model SmtpConfig {
 model Campaign {
   id              String         @id @default(uuid())
   name            String
-  templateId      String
+  templateId      String?        // Optional now, used for single-email campaigns
+  sequenceId      String?
+  sequence        Sequence?      @relation(fields: [sequenceId], references: [id])
   status          String         @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
   leads           CampaignLead[]
   scheduleConfig  String?        // JSON: { delayMin: 120, delayMax: 600, dailyLimit: 50 }
+  searchQuery     String?        // e.g. "electrician in Dayton, OH"
   lastProcessedAt DateTime?
   isProcessing    Boolean        @default(false)
   startedAt       DateTime?
@@ -83,4 +88,30 @@ model CampaignLead {
   @@index([status])              // Global status filtering
   @@index([scheduledFor])        // Cron job queries for scheduled emails
   @@index([sentAt])              // Analytics and reporting queries
+  
+  // Sequence Tracking
+  currentStep Int      @default(1)
+  nextStepAt  DateTime?
+}
+
+model Sequence {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  steps       SequenceStep[]
+  campaigns   Campaign[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model SequenceStep {
+  id          String   @id @default(uuid())
+  sequenceId  String
+  sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  templateId  String
+  template    Template @relation(fields: [templateId], references: [id])
+  order       Int      // 1, 2, 3
+  delayDays   Int      // Days to wait after previous step (0 for first step)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

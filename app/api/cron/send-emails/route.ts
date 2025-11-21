@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { sendEmail } from '@/lib/email';
 
-export const maxDuration = 60; // Try to extend timeout (Hobby limit might be 10s, but worth trying)
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
@@ -12,60 +12,126 @@ export async function GET(req: NextRequest) {
     const smtpConfig = await prisma.smtpConfig.findFirst();
     if (!smtpConfig) return NextResponse.json({ message: 'SMTP not configured' });
 
+    if (smtpConfig.isSystemPaused) {
+      return NextResponse.json({ message: 'System is paused by Kill Switch' });
+    }
+
     if (smtpConfig.sentToday >= smtpConfig.dailyLimit) {
       return NextResponse.json({ message: 'Daily limit reached' });
     }
 
-    // Process campaigns
-    const campaigns = await prisma.campaign.findMany({
-      where: { status: 'ACTIVE', isProcessing: false },
+    // 1. Find Eligible Leads for Processing
+    // - Status is QUEUED (Step 1) OR SENT (Waiting for Step 2+)
+    // - nextStepAt is null (Step 1) OR in the past (Step 2+)
+    // - Lead has NOT replied
+    // - Campaign is ACTIVE
+    const eligibleLeads = await prisma.campaignLead.findMany({
+      where: {
+        campaign: { status: 'ACTIVE' },
+        lead: { status: { not: 'REPLIED' } }, // Stop if replied
+        OR: [
+          { status: 'QUEUED' }, // Ready for Step 1
+          {
+            status: 'SENT',     // Waiting for next step
+            nextStepAt: { lte: new Date() }
+          }
+        ]
+      },
+      include: {
+        lead: true,
+        campaign: {
+          include: {
+            sequence: {
+              include: { steps: true }
+            }
+          }
+        }
+      },
+      take: 10 // Batch size
     });
 
     let processed = 0;
     const results = [];
-    const MAX_BATCH_SIZE = 10; // Send up to 10 emails per run (fit in ~10-20s)
 
-    for (const campaign of campaigns) {
-      // Lock campaign
-      const lock = await prisma.campaign.updateMany({
-        where: { id: campaign.id, isProcessing: false },
-        data: { isProcessing: true }
-      });
-      if (lock.count === 0) continue;
+    for (const item of eligibleLeads) {
+      // Double check daily limit
+      const currentConfig = await prisma.smtpConfig.findFirst();
+      if (!currentConfig || currentConfig.sentToday >= currentConfig.dailyLimit) break;
 
       try {
-        // Send loop
-        while (processed < MAX_BATCH_SIZE) {
-          // Check daily limit again
-          const currentConfig = await prisma.smtpConfig.findFirst();
-          if (!currentConfig || currentConfig.sentToday >= currentConfig.dailyLimit) break;
-
-          const campaignLead = await prisma.campaignLead.findFirst({
-            where: { campaignId: campaign.id, status: 'QUEUED' },
-            include: { lead: true }
-          });
-
-          if (!campaignLead) break; // No more leads in this campaign
-
-          await sendEmailWithRetry(smtpConfig, await prisma.template.findUniqueOrThrow({ where: { id: campaign.templateId } }), campaignLead);
-
-          // Update status
-          await prisma.$transaction([
-            prisma.campaignLead.update({ where: { id: campaignLead.id }, data: { status: 'SENT', sentAt: new Date() } }),
-            prisma.smtpConfig.update({ where: { id: smtpConfig.id }, data: { sentToday: { increment: 1 } } })
-          ]);
-
-          processed++;
-          results.push({ email: campaignLead.lead.email, status: 'sent' });
-
-          // Small delay to be nice to SMTP server (1s)
-          await new Promise(r => setTimeout(r, 1000));
+        // Determine Step
+        const sequence = item.campaign.sequence;
+        if (!sequence) {
+          // Fallback for legacy campaigns (single template)
+          if (item.campaign.templateId && item.status === 'QUEUED') {
+            const template = await prisma.template.findUnique({ where: { id: item.campaign.templateId } });
+            if (template) {
+              await sendEmailWithRetry(smtpConfig, template, item);
+              await markSent(item.id, smtpConfig.id);
+              processed++;
+              results.push({ email: item.lead.email, step: 'Legacy', status: 'sent' });
+            }
+          }
+          continue;
         }
-      } finally {
-        await prisma.campaign.update({ where: { id: campaign.id }, data: { isProcessing: false } });
-      }
 
-      if (processed >= MAX_BATCH_SIZE) break;
+        // Sequence Logic
+        const currentStepNum = item.currentStep;
+        const step = sequence.steps.find(s => s.order === currentStepNum);
+
+        if (!step) {
+          // No step found (maybe completed?), mark complete
+          await prisma.campaignLead.update({ where: { id: item.id }, data: { status: 'COMPLETED' } });
+          continue;
+        }
+
+        // Get Template
+        const template = await prisma.template.findUnique({ where: { id: step.templateId } });
+        if (!template) throw new Error(`Template not found for step ${currentStepNum}`);
+
+        // Send Email
+        await sendEmailWithRetry(smtpConfig, template, item);
+
+        // Calculate Next Step
+        const nextStepNum = currentStepNum + 1;
+        const nextStep = sequence.steps.find(s => s.order === nextStepNum);
+
+        let updateData: any = {
+          status: 'SENT',
+          sentAt: new Date(),
+          currentStep: nextStepNum
+        };
+
+        if (nextStep) {
+          // Schedule next step
+          const nextDate = new Date();
+          nextDate.setDate(nextDate.getDate() + nextStep.delayDays);
+          updateData.nextStepAt = nextDate;
+        } else {
+          // Sequence complete
+          updateData.status = 'COMPLETED';
+          updateData.nextStepAt = null;
+        }
+
+        // Update DB
+        await prisma.$transaction([
+          prisma.campaignLead.update({ where: { id: item.id }, data: updateData }),
+          prisma.smtpConfig.update({ where: { id: smtpConfig.id }, data: { sentToday: { increment: 1 } } })
+        ]);
+
+        processed++;
+        results.push({ email: item.lead.email, step: currentStepNum, status: 'sent' });
+
+        // Rate limit delay
+        await new Promise(r => setTimeout(r, 1000));
+
+      } catch (error: any) {
+        console.error(`Failed to process lead ${item.lead.email}:`, error);
+        await prisma.campaignLead.update({
+          where: { id: item.id },
+          data: { status: 'FAILED', errorMessage: error.message }
+        });
+      }
     }
 
     return NextResponse.json({ processed, results });
@@ -75,30 +141,22 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function sendEmailWithRetry(
-  config: any,
-  template: any,
-  campaignLead: any,
-  maxRetries = 3
-) {
+async function markSent(campaignLeadId: string, configId: string) {
+  await prisma.$transaction([
+    prisma.campaignLead.update({ where: { id: campaignLeadId }, data: { status: 'SENT', sentAt: new Date() } }),
+    prisma.smtpConfig.update({ where: { id: configId }, data: { sentToday: { increment: 1 } } })
+  ]);
+}
+
+async function sendEmailWithRetry(config: any, template: any, campaignLead: any, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       await sendEmail(config, template, campaignLead.lead);
       return;
     } catch (error: any) {
       if (i === maxRetries - 1) {
-        // Final retry failed
-        await prisma.campaignLead.update({
-          where: { id: campaignLead.id },
-          data: {
-            status: 'FAILED',
-            errorMessage: error.message,
-            retryCount: i + 1,
-          },
-        });
         throw error;
       }
-      // Wait before retry (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, 2 ** i * 1000));
     }
   }
@@ -110,16 +168,4 @@ async function resetDailyLimits() {
     where: { lastResetDate: { lt: new Date(today) } },
     data: { sentToday: 0, lastResetDate: new Date() },
   });
-}
-
-async function calculateBounceRate(campaignId: string) {
-  const leads = await prisma.campaignLead.findMany({
-    where: { campaignId },
-    select: { status: true },
-  });
-
-  const total = leads.length;
-  const failed = leads.filter((l: { status: string }) => l.status === 'FAILED').length;
-
-  return total > 0 ? failed / total : 0;
 }

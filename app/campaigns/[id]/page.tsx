@@ -21,7 +21,7 @@ export default async function CampaignDetailPage({ params }: { params: { id: str
   }
 
   const template = await prisma.template.findUnique({
-    where: { id: campaign.templateId },
+    where: { id: campaign.templateId || undefined },
   });
 
   const stats = {
