@@ -290,7 +290,7 @@ export async function toggleSystemPause(isPaused: boolean) {
     }
 }
 
-export async function runManualCron(job: 'send-emails' | 'find-leads') {
+export async function runManualCron(job: 'send-emails' | 'find-leads' | 'master') {
     try {
         const { processEmailQueue, findNewLeads } = await import('@/lib/cron-services');
 
@@ -300,6 +300,14 @@ export async function runManualCron(job: 'send-emails' | 'find-leads') {
         } else if (job === 'find-leads') {
             const result = await findNewLeads();
             return { success: true, ...result };
+        } else if (job === 'master') {
+            const emailResult = await processEmailQueue();
+            const leadResult = await findNewLeads();
+            return {
+                success: true,
+                message: `Master Cron: Emails (${emailResult.message}), Leads (${leadResult.summary?.length || 0} campaigns)`,
+                results: { emails: emailResult, leads: leadResult }
+            };
         }
 
         return { error: 'Invalid job name' };

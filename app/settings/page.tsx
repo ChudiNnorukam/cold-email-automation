@@ -211,7 +211,7 @@ export default function SettingsPage() {
                 onClick={async () => {
                   if (confirm('Run email sending job now?')) {
                     const { runManualCron } = await import('@/app/actions');
-                    const result = await runManualCron('send-emails');
+                    const result = await runManualCron('master');
                     if ((result as any).success) {
                       alert('Processed ' + ((result as any).message || 'emails'));
                     } else {
