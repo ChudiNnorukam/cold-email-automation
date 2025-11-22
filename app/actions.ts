@@ -28,10 +28,53 @@ function validateLeadStatus(status: string): status is LeadStatus {
     return VALID_LEAD_STATUSES.includes(status as any);
 }
 
-// ... schemas
+const LeadSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    email: z.string().email("Invalid email address"),
+    company: z.string().min(1, "Company is required"),
+    notes: z.string().optional(),
+});
+
+const TemplateSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    subject: z.string().min(1, "Subject is required"),
+    body: z.string().min(1, "Body is required"),
+});
+
+const SmtpConfigSchema = z.object({
+    provider: z.string().min(1, "Provider is required"),
+    host: z.string().optional(),
+    port: z.number().optional(),
+    secure: z.boolean().default(true),
+    user: z.string().min(1, "User is required"),
+    password: z.string().min(1, "Password is required"),
+    fromName: z.string().min(1, "From name is required"),
+    fromEmail: z.string().email("Invalid email address"),
+    dailyLimit: z.number().min(1).default(50),
+});
+
+const CampaignSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    templateId: z.string().min(1, "Template is required"),
+    leadIds: z.array(z.string()).min(1, "At least one lead is required"),
+});
 
 export async function createLead(formData: FormData) {
-    // ... (parsing)
+    const rawData = {
+        name: formData.get("name")?.toString(),
+        email: formData.get("email")?.toString(),
+        company: formData.get("company")?.toString(),
+        notes: formData.get("notes")?.toString() || undefined,
+    };
+
+    const result = LeadSchema.safeParse(rawData);
+
+    if (!result.success) {
+        console.error("Validation error:", result.error.flatten());
+        // In a real app, we'd return these errors to the form.
+        // For now, we'll throw or return early to prevent bad data.
+        return { error: "Validation failed" };
+    }
 
     try {
         await prisma.lead.create({
@@ -40,9 +83,13 @@ export async function createLead(formData: FormData) {
                 status: LeadStatus.NEW,
             },
         });
-        // ...
+
+        revalidatePath("/leads");
+        revalidatePath("/");
+        return { success: true };
     } catch (error) {
-        // ...
+        console.error("Failed to create lead:", error);
+        return { error: "Failed to create lead. Please try again." };
     }
 }
 
