@@ -34,8 +34,8 @@ Before clicking "Deploy", expand the **"Environment Variables"** section and add
 
 ## 4. Cron Job Verification
 Once deployed, Vercel will automatically detect the `vercel.json` file.
-*   **Schedule:** It is configured to run **Hourly** between 8am - 5pm PST (approx).
-*   **Why Hourly?** Sending 24 emails at once can trigger spam filters. Our system sends them in small batches (trickle sending) throughout the day, which is much safer.
+*   **Schedule:** It is configured to run **Daily** at 9am PST (17:00 UTC).
+*   **Note:** On Vercel Hobby plan, you are limited to 1 cron job per day. For hourly sending, you would need to upgrade to Pro. For now, this will send a batch once a day.
 
 ## 5. Verify It's Working
 1.  Go to your Vercel Project Dashboard.
