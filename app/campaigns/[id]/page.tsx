@@ -3,9 +3,10 @@ import { notFound } from 'next/navigation';
 import CampaignControls from '@/components/CampaignControls';
 import Link from 'next/link';
 
-export default async function CampaignDetailPage({ params }: { params: { id: string } }) {
+export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const campaign = await prisma.campaign.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       leads: {
         include: {
