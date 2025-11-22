@@ -147,7 +147,7 @@ export class GooglePlacesLeadFinder implements LeadFinder {
 
         try {
             while (leads.length < limit) {
-                const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+                const apiResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -161,12 +161,13 @@ export class GooglePlacesLeadFinder implements LeadFinder {
                     })
                 });
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Google Places API Error: ${response.status} ${response.statusText} - ${errorText}`);
+                if (!apiResponse.ok) {
+                    const errorText = await apiResponse.text();
+                    console.error(`Google Places API Error (${apiResponse.status}): ${errorText}`);
+                    break;
                 }
 
-                const data = await response.json();
+                const data = await apiResponse.json();
                 const places = data.places || [];
 
                 if (places.length === 0) break;
