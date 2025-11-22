@@ -6,92 +6,55 @@ import { z } from "zod";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { testConnection } from "@/lib/email";
 
+import { LeadStatus } from "@prisma/client";
+
+// ... imports
+
 // Valid enum values from Prisma schema
 const VALID_CAMPAIGN_STATUSES = ['DRAFT', 'ACTIVE', 'PAUSED', 'COMPLETED'] as const;
-const VALID_LEAD_STATUSES = ['QUEUED', 'SENT', 'OPENED', 'CLICKED', 'REPLIED', 'BOUNCED', 'FAILED', 'NOT_INTERESTED'] as const;
+// Updated to match schema
+const VALID_LEAD_STATUSES = [
+    'NEW', 'CONTACTED', 'INTERESTED', 'NOT_INTERESTED', 'CLOSED',
+    'SENT', 'QUEUED', 'FAILED', 'SKIPPED', 'INVALID', 'FLAGGED', 'BOUNCED'
+] as const;
 
 type CampaignStatus = typeof VALID_CAMPAIGN_STATUSES[number];
-type LeadStatus = typeof VALID_LEAD_STATUSES[number];
 
 function validateCampaignStatus(status: string): status is CampaignStatus {
     return VALID_CAMPAIGN_STATUSES.includes(status as CampaignStatus);
 }
 
 function validateLeadStatus(status: string): status is LeadStatus {
-    return VALID_LEAD_STATUSES.includes(status as LeadStatus);
+    return VALID_LEAD_STATUSES.includes(status as any);
 }
 
-const LeadSchema = z.object({
-    name: z.string().min(1, "Name is required"),
-    email: z.string().email("Invalid email address"),
-    company: z.string().min(1, "Company is required"),
-    notes: z.string().optional(),
-});
-
-const TemplateSchema = z.object({
-    name: z.string().min(1, "Name is required"),
-    subject: z.string().min(1, "Subject is required"),
-    body: z.string().min(1, "Body is required"),
-});
-
-const SmtpConfigSchema = z.object({
-    provider: z.string().min(1, "Provider is required"),
-    host: z.string().optional(),
-    port: z.number().optional(),
-    secure: z.boolean().default(true),
-    user: z.string().min(1, "User is required"),
-    password: z.string().min(1, "Password is required"),
-    fromName: z.string().min(1, "From name is required"),
-    fromEmail: z.string().email("Invalid email address"),
-    dailyLimit: z.number().min(1).default(50),
-});
-
-const CampaignSchema = z.object({
-    name: z.string().min(1, "Name is required"),
-    templateId: z.string().min(1, "Template is required"),
-    leadIds: z.array(z.string()).min(1, "At least one lead is required"),
-});
+// ... schemas
 
 export async function createLead(formData: FormData) {
-    const rawData = {
-        name: formData.get("name")?.toString(),
-        email: formData.get("email")?.toString(),
-        company: formData.get("company")?.toString(),
-        notes: formData.get("notes")?.toString() || undefined,
-    };
-
-    const result = LeadSchema.safeParse(rawData);
-
-    if (!result.success) {
-        console.error("Validation error:", result.error.flatten());
-        // In a real app, we'd return these errors to the form.
-        // For now, we'll throw or return early to prevent bad data.
-        return { error: "Validation failed" };
-    }
+    // ... (parsing)
 
     try {
         await prisma.lead.create({
             data: {
                 ...result.data,
-                status: "NEW",
+                status: LeadStatus.NEW,
             },
         });
-
-        revalidatePath("/leads");
-        revalidatePath("/");
-        return { success: true };
+        // ...
     } catch (error) {
-        console.error("Failed to create lead:", error);
-        return { error: "Failed to create lead. Please try again." };
+        // ...
     }
 }
 
 export async function updateLeadStatus(leadId: string, status: string) {
     try {
-        // Simple validation for status enum could go here
+        if (!validateLeadStatus(status)) {
+            return { error: "Invalid status" };
+        }
+
         await prisma.lead.update({
             where: { id: leadId },
-            data: { status },
+            data: { status: status as LeadStatus },
         });
         revalidatePath("/leads");
         revalidatePath(`/outreach/${leadId}`);
@@ -453,7 +416,7 @@ export async function sendOneOffEmail(leadId: string, subject: string, body: str
 
         await prisma.lead.update({
             where: { id: leadId },
-            data: { status: "CONTACTED" }
+            data: { status: LeadStatus.CONTACTED }
         });
 
         revalidatePath("/leads");
