@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma';
+import { LeadStatus } from '@prisma/client';
 
 async function seedLeads() {
     console.log('🌱 Seeding 5 quality leads for "No Website Outreach"...');
@@ -58,7 +59,7 @@ async function seedLeads() {
                 name: l.name,
                 email: l.email,
                 company: l.company,
-                status: "NEW",
+                status: LeadStatus.NEW,
                 notes: l.notes,
             }
         });

@@ -1,5 +1,5 @@
 import imaps from 'imap-simple';
-import { simpleParser } from 'mailparser';
+import { PrismaClient, LeadStatus } from '@prisma/client';
 import prisma from '../lib/prisma';
 
 async function checkBounces() {
@@ -71,13 +71,13 @@ async function checkBounces() {
                         // Update Lead Status
                         await prisma.lead.update({
                             where: { id: lead.id },
-                            data: { status: 'BOUNCED' }
+                            data: { status: LeadStatus.BOUNCED }
                         });
 
                         // Update CampaignLead Status
                         await prisma.campaignLead.updateMany({
                             where: { leadId: lead.id },
-                            data: { status: 'BOUNCED' }
+                            data: { status: LeadStatus.BOUNCED }
                         });
                     }
                 }

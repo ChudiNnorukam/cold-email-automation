@@ -1,5 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, LeadStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 

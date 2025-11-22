@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { LeadStatus } from "@prisma/client";
 import { sendEmail } from "@/lib/email";
 import { getLeadFinder } from "@/lib/lead-finder";
 
@@ -215,7 +216,7 @@ export async function findNewLeads() {
                     const lead = await prisma.lead.create({
                         data: {
                             ...leadData,
-                            status: 'NEW'
+                            status: LeadStatus.NEW
                         }
                     });
 

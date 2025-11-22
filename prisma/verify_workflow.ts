@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, LeadStatus } from '@prisma/client';
 import nodemailer from 'nodemailer';
 
 const prisma = new PrismaClient();
@@ -20,7 +20,7 @@ async function main() {
             name: "Verification Test",
             email: "test@example.com", // Dummy, will be overridden
             company: "Test Corp",
-            status: "NEW"
+            status: LeadStatus.NEW
         }
     });
 
@@ -70,7 +70,7 @@ async function main() {
         console.log(`Attempting to send to SAFE_RECIPIENT: ${SAFE_RECIPIENT}...`);
 
         await transporter.sendMail({
-            from: `"${smtpConfig.fromName}" <${smtpConfig.fromEmail}>`,
+            from: `"${smtpConfig.fromName}" < ${smtpConfig.fromEmail}> `,
             to: SAFE_RECIPIENT,
             subject: testTemplate.subject.replace('{{Company}}', testLead.company),
             text: testTemplate.body.replace('{{Name}}', testLead.name).replace('{{Company}}', testLead.company),

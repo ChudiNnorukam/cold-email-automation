@@ -1,7 +1,6 @@
 import { chromium } from 'playwright';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
+import { LeadStatus } from '@prisma/client';
 
 const SEARCH_QUERIES = [
     "plumbers in austin tx",
@@ -90,7 +89,7 @@ async function main() {
                     name: leadData.name,
                     email: leadData.email,
                     company: leadData.company,
-                    status: "NEW",
+                    status: LeadStatus.NEW,
                     notes: leadData.notes
                 }
             });

@@ -1,6 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
+import { LeadStatus } from '@prisma/client';
 
 async function main() {
     console.log('Adding "No Website" leads...');
@@ -60,7 +59,7 @@ async function main() {
                     name: leadData.name,
                     email: leadData.email,
                     company: leadData.company,
-                    status: "NEW",
+                    status: LeadStatus.NEW,
                     notes: leadData.notes
                 }
             });

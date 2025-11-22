@@ -1,5 +1,7 @@
-import prisma from '../lib/prisma';
+import { PrismaClient, LeadStatus } from '@prisma/client';
 import { getLeadFinder } from '../lib/lead-finder';
+
+const prisma = new PrismaClient();
 
 async function sourceLeads() {
     console.log("Sourcing 15 leads for 'No Website Outreach'...");
@@ -36,7 +38,7 @@ async function sourceLeads() {
                 name: leadData.name,
                 email: leadData.email,
                 company: leadData.company,
-                status: "NEW",
+                status: LeadStatus.NEW,
                 notes: `Manual source for ${campaign.name}`
             }
         });

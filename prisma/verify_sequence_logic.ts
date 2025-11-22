@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma';
+import { LeadStatus } from '@prisma/client';
 
 async function verifySequenceLogic() {
     console.log('🧪 Verifying Sequence Logic...');
@@ -9,7 +10,7 @@ async function verifySequenceLogic() {
             name: "Sequence Test",
             email: "test-sequence@example.com",
             company: "Test Corp",
-            status: "NEW"
+            status: LeadStatus.NEW
         }
     });
 
@@ -81,7 +82,7 @@ async function verifySequenceLogic() {
         // Simulate Reply
         await prisma.lead.update({
             where: { id: lead.id },
-            data: { status: 'REPLIED' }
+            data: { status: LeadStatus.REPLIED }
         });
         console.log('   ✅ Simulated User Reply');
     } else {

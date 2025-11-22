@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { LeadStatus } from '@prisma/client';
 import { createLead } from '@/app/actions';
 import prisma from '@/lib/prisma';
 
@@ -39,7 +40,7 @@ describe('Server Actions', () => {
                     email: 'john@example.com',
                     company: 'Acme Inc',
                     notes: undefined,
-                    status: 'NEW',
+                    status: LeadStatus.NEW,
                 },
             });
         });

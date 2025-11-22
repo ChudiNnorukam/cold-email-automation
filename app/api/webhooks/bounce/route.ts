@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
         // if (event === 'bounce') {
         //   await prisma.lead.update({
         //     where: { email },
-        //     data: { status: 'BOUNCED' }
+        //     data: { status: LeadStatus.BOUNCED }
         //   });
         // }
 
