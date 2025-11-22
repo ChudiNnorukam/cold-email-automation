@@ -7,12 +7,27 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  NOT_INTERESTED
+  CLOSED
+  SENT
+  QUEUED
+  FAILED
+  SKIPPED
+  INVALID
+  FLAGGED
+  BOUNCED
+}
+
 model Lead {
   id           String         @id @default(uuid())
   name         String
   email        String
   company      String
-  status       String         @default("NEW") // NEW, CONTACTED, REPLIED, INTERESTED, NOT_INTERESTED
+  status       LeadStatus     @default(NEW)
   notes        String?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
@@ -31,6 +46,8 @@ model Template {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   steps     SequenceStep[]
+  campaignsA Campaign[] @relation("CampaignTemplateA")
+  campaignsB Campaign[] @relation("CampaignTemplateB")
 }
 
 model SmtpConfig {
@@ -46,6 +63,7 @@ model SmtpConfig {
   dailyLimit    Int      @default(50)
   sentToday     Int      @default(0)
   lastResetDate DateTime @default(now())
+  lastCronRun   DateTime?
   isSystemPaused Boolean  @default(false)
   createdAt     DateTime @default(now())
 
@@ -56,6 +74,9 @@ model Campaign {
   id              String         @id @default(uuid())
   name            String
   templateId      String?        // Optional now, used for single-email campaigns
+  templateBId     String?        // For A/B Testing
+  template        Template?      @relation("CampaignTemplateA", fields: [templateId], references: [id])
+  templateB       Template?      @relation("CampaignTemplateB", fields: [templateBId], references: [id])
   sequenceId      String?
   sequence        Sequence?      @relation(fields: [sequenceId], references: [id])
   status          String         @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
@@ -108,8 +129,8 @@ model SequenceStep {
   id          String   @id @default(uuid())
   sequenceId  String
   sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
-  templateId  String
-  template    Template @relation(fields: [templateId], references: [id])
+  templateId   String?
+  template     Template? @relation(fields: [templateId], references: [id])
   order       Int      // 1, 2, 3
   delayDays   Int      // Days to wait after previous step (0 for first step)
   createdAt   DateTime @default(now())

@@ -2,6 +2,8 @@ import prisma from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import CampaignControls from '@/components/CampaignControls';
 import Link from 'next/link';
+import ExportLeadsButton from '@/components/ExportLeadsButton';
+import EnrichLeadButton from '@/components/EnrichLeadButton';
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,6 +36,14 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   const progress = stats.total > 0 ? (stats.sent / stats.total) * 100 : 0;
 
+  const smtpConfig = await prisma.smtpConfig.findFirst();
+
+  // Calculate daily limit status
+  const dailyLimit = smtpConfig?.dailyLimit || 50;
+  const sentToday = smtpConfig?.sentToday || 0;
+  const isLimitReached = sentToday >= dailyLimit;
+  const lastRun = smtpConfig?.lastCronRun;
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
@@ -42,14 +52,36 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </Link>
       </div>
 
+      {/* Rate Limit Warning */}
+      {isLimitReached && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <h3 className="font-bold text-yellow-800">Daily Limit Reached ({sentToday}/{dailyLimit})</h3>
+            <p className="text-sm text-yellow-700">
+              The system has paused sending for today to protect your email reputation.
+              It will automatically resume tomorrow.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold">{campaign.name}</h1>
           <p className="text-gray-600 mt-1">
             Template: <span className="font-semibold">{template?.name}</span>
           </p>
+          {lastRun && (
+            <p className="text-xs text-gray-400 mt-2">
+              Last Run: {new Date(lastRun).toLocaleString()}
+            </p>
+          )}
         </div>
-        <CampaignControls campaignId={campaign.id} status={campaign.status} />
+        <div className="flex gap-2">
+          <ExportLeadsButton leads={campaign.leads} campaignName={campaign.name} />
+          <CampaignControls campaignId={campaign.id} status={campaign.status} />
+        </div>
       </div>
 
       {/* Stats */}
@@ -134,7 +166,12 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           <tbody className="divide-y">
             {campaign.leads.map((cl: any) => (
               <tr key={cl.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">{cl.lead.name}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    {cl.lead.name}
+                    <EnrichLeadButton leadId={cl.lead.id} />
+                  </div>
+                </td>
                 <td className="px-4 py-3 text-sm">{cl.lead.email}</td>
                 <td className="px-4 py-3 text-sm">{cl.lead.company}</td>
                 <td className="px-4 py-3">
@@ -163,7 +200,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </table>
       </div>
 
-      {campaign.status === 'ACTIVE' && (
+      {campaign.status === 'ACTIVE' && !isLimitReached && (
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
           <p className="text-sm text-blue-800">
             ℹ️ Campaign is active. Emails are being sent with 2-10 minute delays. Check back

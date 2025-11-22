@@ -137,7 +137,10 @@ export async function processEmailQueue() {
                     }),
                     prisma.smtpConfig.update({
                         where: { id: smtpConfig.id },
-                        data: { sentToday: { increment: 1 } }
+                        data: {
+                            sentToday: { increment: 1 },
+                            lastCronRun: new Date()
+                        }
                     })
                 ]);
 
