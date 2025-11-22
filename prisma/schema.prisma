@@ -30,6 +30,7 @@ model Lead {
   name         String
   email        String
   company      String
+  website      String?
   status       LeadStatus     @default(NEW)
   notes        String?
   createdAt    DateTime       @default(now())

@@ -45,10 +45,19 @@ export async function processEmailQueue() {
         smtpConfig.sentToday = 0;
     }
 
-    // Find campaigns that are ACTIVE and have a template
+    // Find campaigns that are ACTIVE
     const activeCampaigns = await prisma.campaign.findMany({
         where: { status: 'ACTIVE' },
-        select: { id: true, templateId: true, scheduleConfig: true }
+        include: {
+            sequence: {
+                include: {
+                    steps: {
+                        orderBy: { order: 'asc' },
+                        include: { template: true }
+                    }
+                }
+            }
+        }
     });
 
     if (activeCampaigns.length === 0) {
@@ -59,16 +68,35 @@ export async function processEmailQueue() {
     const results = [];
 
     for (const campaign of activeCampaigns) {
-        if (!campaign.templateId) continue;
+        // Determine if we are using a Sequence or a Single Template
+        const isSequence = !!campaign.sequenceId && !!campaign.sequence;
 
-        // Check campaign schedule/limits (simplified for now)
-        // In a real app, parse scheduleConfig and check time windows
+        // Find eligible leads
+        // Logic:
+        // 1. Status is QUEUED (Step 1)
+        // 2. OR Status is SENT/CONTACTED but nextStepAt is past (Step > 1)
+        // 3. AND Status is NOT REPLIED, BOUNCED, UNSUBSCRIBED, FAILED
 
-        // Find eligible leads: QUEUED status
         const leadsToProcess = await prisma.campaignLead.findMany({
             where: {
                 campaignId: campaign.id,
-                status: 'QUEUED'
+                status: { in: ['QUEUED', 'SENT', 'CONTACTED'] },
+                lead: {
+                    status: { notIn: [LeadStatus.REPLIED, LeadStatus.BOUNCED, LeadStatus.NOT_INTERESTED] }
+                },
+                OR: [
+                    {
+                        status: 'QUEUED',
+                        OR: [
+                            { scheduledFor: null },
+                            { scheduledFor: { lte: new Date() } }
+                        ]
+                    }, // Ready for Step 1 (Now or Past Scheduled Time)
+                    {
+                        status: { in: ['SENT', 'CONTACTED'] },
+                        nextStepAt: { lte: new Date() } // Ready for Next Step
+                    }
+                ]
             },
             take: 10, // Batch size
             include: { lead: true }
@@ -80,30 +108,60 @@ export async function processEmailQueue() {
             }
 
             try {
-                // Get template
-                const template = await prisma.template.findUnique({
-                    where: { id: campaign.templateId }
-                });
+                let templateToUse = null;
+                let nextStepDelay = 0;
+                let isLastStep = false;
 
-                if (!template) {
-                    throw new Error('Template not found');
+                if (isSequence) {
+                    const steps = campaign.sequence!.steps;
+                    const currentStepIndex = item.currentStep - 1; // 1-based to 0-based
+
+                    if (currentStepIndex >= steps.length) {
+                        // Already finished sequence?
+                        continue;
+                    }
+
+                    const step = steps[currentStepIndex];
+                    templateToUse = step.template;
+
+                    // Check if there is a next step
+                    if (currentStepIndex + 1 < steps.length) {
+                        nextStepDelay = steps[currentStepIndex + 1].delayDays;
+                    } else {
+                        isLastStep = true;
+                    }
+
+                } else {
+                    // Legacy Single Template Mode
+                    if (item.currentStep > 1) continue; // Only 1 step
+
+                    if (campaign.templateId) {
+                        templateToUse = await prisma.template.findUnique({
+                            where: { id: campaign.templateId }
+                        });
+                    }
+                    isLastStep = true;
                 }
 
-                // --- SAFETY: Email Verification ---
-                const { verifyEmailDomain, isRoleBasedEmail } = await import("@/lib/email-verifier");
+                if (!templateToUse) {
+                    console.warn(`No template found for campaign ${campaign.name} step ${item.currentStep}`);
+                    continue;
+                }
 
+                // --- SAFETY CHECKS (Verification, Content) ---
+                const { verifyEmailDomain, isRoleBasedEmail } = await import("@/lib/email-verifier");
                 if (isRoleBasedEmail(item.lead.email)) {
-                    console.warn(`Skipping role-based email: ${item.lead.email}`);
                     await prisma.campaignLead.update({
                         where: { id: item.id },
-                        data: { status: 'SKIPPED', errorMessage: 'Role-based email detected' }
+                        data: { status: 'SKIPPED', errorMessage: 'Role-based email' }
                     });
                     continue;
                 }
 
+                // Only verify domain on Step 1 to save time/resources? Or every time?
+                // Let's do it every time for safety.
                 const isValidDomain = await verifyEmailDomain(item.lead.email);
                 if (!isValidDomain) {
-                    console.warn(`Skipping invalid domain: ${item.lead.email}`);
                     await prisma.campaignLead.update({
                         where: { id: item.id },
                         data: { status: 'INVALID', errorMessage: 'DNS verification failed' }
@@ -111,12 +169,9 @@ export async function processEmailQueue() {
                     continue;
                 }
 
-                // --- SAFETY: Content Check ---
                 const { checkContentSafety } = await import("@/lib/content-safety");
-                const safetyResult = checkContentSafety(template.subject, template.body);
-
+                const safetyResult = checkContentSafety(templateToUse.subject, templateToUse.body);
                 if (!safetyResult.safe) {
-                    console.warn(`Skipping unsafe content: ${safetyResult.triggers.join(', ')}`);
                     await prisma.campaignLead.update({
                         where: { id: item.id },
                         data: { status: 'FLAGGED', errorMessage: `Spam triggers: ${safetyResult.triggers.join(', ')}` }
@@ -124,17 +179,35 @@ export async function processEmailQueue() {
                     continue;
                 }
 
-                // Send email
-                await sendEmail(smtpConfig, template, item.lead);
+                // --- SEND EMAIL ---
+                await sendEmail(smtpConfig, templateToUse, item.lead);
 
-                // Transactional Update: Status + Usage
+                // --- UPDATE STATUS ---
+                const updateData: any = {
+                    status: 'SENT',
+                    sentAt: new Date(),
+                    currentStep: { increment: 1 }
+                };
+
+                if (!isLastStep) {
+                    // Schedule next step
+                    const nextDate = new Date();
+                    nextDate.setDate(nextDate.getDate() + nextStepDelay);
+                    updateData.nextStepAt = nextDate;
+                } else {
+                    updateData.nextStepAt = null;
+                    // Maybe mark as COMPLETED? For now keep as SENT to show activity.
+                }
+
+                // Transactional Update
                 await prisma.$transaction([
                     prisma.campaignLead.update({
                         where: { id: item.id },
-                        data: {
-                            status: 'SENT',
-                            sentAt: new Date()
-                        }
+                        data: updateData
+                    }),
+                    prisma.lead.update({
+                        where: { id: item.leadId },
+                        data: { status: LeadStatus.CONTACTED }
                     }),
                     prisma.smtpConfig.update({
                         where: { id: smtpConfig.id },
@@ -146,7 +219,7 @@ export async function processEmailQueue() {
                 ]);
 
                 emailsSent++;
-                results.push({ lead: item.lead.email, status: 'SENT' });
+                results.push({ lead: item.lead.email, status: 'SENT', step: item.currentStep });
 
                 // Rate limit delay
                 await new Promise(r => setTimeout(r, 1000));
