@@ -17,7 +17,7 @@ export async function verifyEmailDomain(email: string): Promise<boolean> {
 }
 
 export function isRoleBasedEmail(email: string): boolean {
-    const rolePrefixes = ['admin', 'support', 'info', 'sales', 'contact', 'help', 'webmaster', 'postmaster', 'hostmaster', 'abuse', 'noreply', 'no-reply'];
+    const rolePrefixes = ['admin', 'support', 'info', 'sales', 'contact', 'help', 'webmaster', 'postmaster', 'hostmaster', 'abuse', 'noreply', 'no-reply', 'office', 'owner', 'billing', 'marketing', 'jobs', 'careers'];
     const prefix = email.split('@')[0].toLowerCase();
     return rolePrefixes.includes(prefix);
 }

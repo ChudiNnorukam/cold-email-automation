@@ -49,9 +49,11 @@ export async function createTransport(smtpConfig: SmtpConfig): Promise<Transport
  * Protects against malicious data in lead fields (name, company, email)
  */
 export function renderTemplate(templateText: string, lead: Lead, isBody: boolean = false, asHtml: boolean = false): string {
-  // 1. Handle Name Edge Cases
+  // 1. Handle Name Edge Cases & Personalization Guardrails
   let safeName = lead.name;
-  if (!safeName || safeName.toLowerCase().includes('unknown') || safeName.trim() === '') {
+  const genericNames = ['office', 'owner', 'support', 'admin', 'info', 'contact', 'sales', 'team'];
+
+  if (!safeName || safeName.toLowerCase().includes('unknown') || safeName.trim() === '' || genericNames.includes(safeName.toLowerCase())) {
     safeName = "there";
   } else {
     // Capitalize first letter just in case
@@ -60,47 +62,52 @@ export function renderTemplate(templateText: string, lead: Lead, isBody: boolean
 
   // 2. Handle Company Edge Cases
   let safeCompany = lead.company;
-  // Remove common suffixes
-  const suffixes = [', LLC', ' LLC', ', Inc.', ' Inc.', ', Inc', ' Inc', ' Ltd.', ' Ltd', ' Pty Ltd'];
-  for (const suffix of suffixes) {
-    if (safeCompany.endsWith(suffix)) {
-      safeCompany = safeCompany.slice(0, -suffix.length);
-    }
-  }
-  // Remove domain extensions if company name is a URL
-  if (safeCompany.includes('.') || safeCompany.includes('www')) {
-    // Remove protocol
-    safeCompany = safeCompany.replace(/(https?:\/\/)?(www\.)?/, '');
+  if (safeCompany) {
+    // Strip legal suffixes (case insensitive regex is better than array loop)
+    safeCompany = safeCompany.replace(/,\s*?llc\.?$/i, '')
+      .replace(/\s+llc\.?$/i, '')
+      .replace(/,\s*?inc\.?$/i, '')
+      .replace(/\s+inc\.?$/i, '')
+      .replace(/,\s*?ltd\.?$/i, '')
+      .replace(/\s+ltd\.?$/i, '')
+      .replace(/,\s*?corp\.?$/i, '')
+      .replace(/\s+corp\.?$/i, '')
+      .replace(/,\s*?pty\s+ltd\.?$/i, '')
+      .replace(/\s+pty\s+ltd\.?$/i, '');
 
-    // Remove TLD (simple approach: take everything before the first dot, or last dot if multiple?)
-    // Better approach: split by dot, take first part unless it's common generic
-    const parts = safeCompany.split('.');
-    if (parts.length > 0) {
-      safeCompany = parts[0];
+    // Remove domain extensions if company name is a URL
+    if (safeCompany.includes('.') || safeCompany.includes('www')) {
+      // Remove protocol
+      safeCompany = safeCompany.replace(/(https?:\/\/)?(www\.)?/, '');
+
+      // Remove TLD
+      const parts = safeCompany.split('.');
+      if (parts.length > 0) {
+        safeCompany = parts[0];
+      }
+
+      // Replace hyphens with spaces (e.g. "my-company" -> "my company")
+      safeCompany = safeCompany.replace(/-/g, ' ');
     }
 
-    // Replace hyphens with spaces (e.g. "my-company" -> "my company")
-    safeCompany = safeCompany.replace(/-/g, ' ');
+    // Capitalize (Title Case)
+    safeCompany = safeCompany.split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+      .trim();
   }
-  // Capitalize (Title Case)
-  safeCompany = safeCompany.split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
 
   // 3. Handle City (if we had a city field, for now fallback)
   const safeCity = "your area";
 
   let rendered = templateText
     .replace(/\{\{Name\}\}/g, safeName)
-    .replace(/\{\{Company\}\}/g, safeCompany)
+    .replace(/\{\{Company\}\}/g, safeCompany || 'your company')
     .replace(/\[City\]/g, safeCity)
     .replace(/\{\{Email\}\}/g, lead.email);
 
   // Append Compliance Footer ONLY for body
   if (isBody) {
-    // Wait, I can't make renderTemplate async easily without breaking callers.
-    // I will assume the import is added.
-
     if (asHtml) {
       // Convert newlines to <br> for HTML body
       // Handle both \r\n and \n
