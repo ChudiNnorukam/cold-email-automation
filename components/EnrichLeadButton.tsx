@@ -11,7 +11,7 @@ export default function EnrichLeadButton({ leadId }: { leadId: string }) {
         setIsLoading(true);
         try {
             const result = await enrichLead(leadId);
-            if (result.success) {
+            if (result.success && result.data) {
                 alert(`Enriched! Found: ${result.data.jobTitle} at ${result.data.companySize}`);
             } else {
                 alert('Failed to enrich lead.');
