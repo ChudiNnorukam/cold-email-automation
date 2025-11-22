@@ -41,7 +41,7 @@ async function enrichLeads() {
                 domain = url.hostname.replace('www.', '');
             } catch (e) {
                 console.warn(`Invalid URL for ${lead.company}: ${lead.website}`);
-                domain = undefined;
+                domain = null;
             }
         }
 
