@@ -20,6 +20,9 @@ enum LeadStatus {
   INVALID
   FLAGGED
   BOUNCED
+  REPLIED
+  OPENED
+  CLICKED
 }
 
 model Lead {

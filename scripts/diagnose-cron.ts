@@ -50,7 +50,7 @@ async function diagnose() {
         const eligible = await prisma.campaignLead.findMany({
             where: {
                 campaignId: camp.id,
-                lead: { status: { not: 'REPLIED' } },
+                lead: { status: { not: LeadStatus.REPLIED } },
                 OR: [
                     { status: 'QUEUED' },
                     {
