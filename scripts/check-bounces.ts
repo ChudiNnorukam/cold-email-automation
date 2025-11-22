@@ -1,4 +1,5 @@
 import imaps from 'imap-simple';
+import { simpleParser } from 'mailparser';
 import { PrismaClient, LeadStatus } from '@prisma/client';
 import prisma from '../lib/prisma';
 
