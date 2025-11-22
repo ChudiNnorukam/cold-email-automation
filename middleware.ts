@@ -1,70 +1,44 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { validateApiKey } from './lib/auth';
 
-/**
- * Middleware for protecting API routes with authentication
- * Runs on all /api/* routes except public endpoints
- */
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
 
-  // Public endpoints that don't require authentication
-  const publicPaths = ['/api/unsubscribe'];
-  if (publicPaths.some(path => pathname.startsWith(path))) {
+  // 1. Exclude Public Routes
+  if (
+    pathname.startsWith('/api/cron') || // Protected by CRON_SECRET
+    pathname.startsWith('/api/unsubscribe') || // Public for leads
+    pathname.startsWith('/_next') || // Next.js internals
+    pathname.startsWith('/static') || // Static files
+    pathname.startsWith('/assets') || // Public assets
+    pathname === '/favicon.ico'
+  ) {
     return NextResponse.next();
   }
 
-  // CRON endpoints require CRON_SECRET header
-  if (pathname.startsWith('/api/cron/')) {
-    const cronSecret = request.headers.get('authorization');
-    const expectedSecret = process.env.CRON_SECRET;
+  // 2. Basic Auth Check
+  const basicAuth = req.headers.get('authorization');
+  const user = process.env.ADMIN_USER || 'admin';
+  const pwd = process.env.ADMIN_PASSWORD || 'admin';
 
-    if (!expectedSecret || expectedSecret.trim().length === 0) {
-      console.error('CRON_SECRET environment variable is not configured');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
+  if (basicAuth) {
+    const authValue = basicAuth.split(' ')[1];
+    const [u, p] = atob(authValue).split(':');
 
-    if (!cronSecret) {
-      return NextResponse.json(
-        { error: 'Missing authorization header' },
-        { status: 401 }
-      );
-    }
-
-    // Support both "Bearer <secret>" and raw secret formats
-    const providedSecret = cronSecret.startsWith('Bearer ')
-      ? cronSecret.slice(7)
-      : cronSecret;
-
-    if (providedSecret !== expectedSecret) {
-      return NextResponse.json(
-        { error: 'Invalid CRON_SECRET' },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.next();
-  }
-
-  // All other API routes require API key authentication
-  if (pathname.startsWith('/api/')) {
-    const apiKey = request.headers.get('x-api-key');
-
-    if (!validateApiKey(apiKey)) {
-      return NextResponse.json(
-        { error: 'Invalid or missing API key' },
-        { status: 401 }
-      );
+    if (u === user && p === pwd) {
+      return NextResponse.next();
     }
   }
 
-  return NextResponse.next();
+  // 3. Challenge
+  return new NextResponse('Authentication Required', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="Secure Dashboard"',
+    },
+  });
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: '/:path*',
 };

@@ -6,12 +6,29 @@ export async function processEmailQueue() {
     const smtpConfig = await prisma.smtpConfig.findFirst();
     if (!smtpConfig) return { message: 'SMTP not configured', status: 400 };
 
+    // @ts-ignore
     if (smtpConfig.isSystemPaused) {
         return { message: 'System is paused by Kill Switch', status: 200 };
     }
 
-    if (smtpConfig.sentToday >= smtpConfig.dailyLimit) {
-        return { message: 'Daily limit reached', status: 200 };
+    // --- SAFETY: Warm-up Logic ---
+    const WARMUP_DAYS = 14;
+    const WARMUP_LIMIT = 10;
+    const HARD_LIMIT = 50;
+
+    const accountAge = Math.floor((new Date().getTime() - new Date(smtpConfig.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    const isWarmupPeriod = accountAge < WARMUP_DAYS;
+
+    // Effective limit is the lower of the configured dailyLimit or the safety limits
+    let effectiveLimit = Math.min(smtpConfig.dailyLimit, HARD_LIMIT);
+
+    if (isWarmupPeriod) {
+        effectiveLimit = Math.min(effectiveLimit, WARMUP_LIMIT);
+        console.log(`🔒 Warm-up mode active (Age: ${accountAge} days). Limit restricted to ${effectiveLimit}.`);
+    }
+
+    if (smtpConfig.sentToday >= effectiveLimit) {
+        return { message: `Daily limit reached (${smtpConfig.sentToday}/${effectiveLimit})`, status: 200 };
     }
 
     // Reset daily limit if needed
@@ -57,7 +74,7 @@ export async function processEmailQueue() {
         });
 
         for (const item of leadsToProcess) {
-            if (smtpConfig.sentToday + emailsSent >= smtpConfig.dailyLimit) {
+            if (smtpConfig.sentToday + emailsSent >= effectiveLimit) {
                 break;
             }
 
@@ -71,23 +88,58 @@ export async function processEmailQueue() {
                     throw new Error('Template not found');
                 }
 
+                // --- SAFETY: Email Verification ---
+                const { verifyEmailDomain, isRoleBasedEmail } = await import("@/lib/email-verifier");
+
+                if (isRoleBasedEmail(item.lead.email)) {
+                    console.warn(`Skipping role-based email: ${item.lead.email}`);
+                    await prisma.campaignLead.update({
+                        where: { id: item.id },
+                        data: { status: 'SKIPPED', errorMessage: 'Role-based email detected' }
+                    });
+                    continue;
+                }
+
+                const isValidDomain = await verifyEmailDomain(item.lead.email);
+                if (!isValidDomain) {
+                    console.warn(`Skipping invalid domain: ${item.lead.email}`);
+                    await prisma.campaignLead.update({
+                        where: { id: item.id },
+                        data: { status: 'INVALID', errorMessage: 'DNS verification failed' }
+                    });
+                    continue;
+                }
+
+                // --- SAFETY: Content Check ---
+                const { checkContentSafety } = await import("@/lib/content-safety");
+                const safetyResult = checkContentSafety(template.subject, template.body);
+
+                if (!safetyResult.safe) {
+                    console.warn(`Skipping unsafe content: ${safetyResult.triggers.join(', ')}`);
+                    await prisma.campaignLead.update({
+                        where: { id: item.id },
+                        data: { status: 'FLAGGED', errorMessage: `Spam triggers: ${safetyResult.triggers.join(', ')}` }
+                    });
+                    continue;
+                }
+
                 // Send email
                 await sendEmail(smtpConfig, template, item.lead);
 
-                // Update status
-                await prisma.campaignLead.update({
-                    where: { id: item.id },
-                    data: {
-                        status: 'SENT',
-                        sentAt: new Date()
-                    }
-                });
-
-                // Update SMTP usage
-                await prisma.smtpConfig.update({
-                    where: { id: smtpConfig.id },
-                    data: { sentToday: { increment: 1 } }
-                });
+                // Transactional Update: Status + Usage
+                await prisma.$transaction([
+                    prisma.campaignLead.update({
+                        where: { id: item.id },
+                        data: {
+                            status: 'SENT',
+                            sentAt: new Date()
+                        }
+                    }),
+                    prisma.smtpConfig.update({
+                        where: { id: smtpConfig.id },
+                        data: { sentToday: { increment: 1 } }
+                    })
+                ]);
 
                 emailsSent++;
                 results.push({ lead: item.lead.email, status: 'SENT' });
@@ -113,7 +165,14 @@ export async function findNewLeads() {
     const campaigns = await prisma.campaign.findMany({
         where: {
             status: 'ACTIVE',
+            // @ts-ignore
             searchQuery: { not: null }
+        },
+        select: {
+            id: true,
+            name: true,
+            // @ts-ignore
+            searchQuery: true
         }
     });
 
@@ -121,19 +180,20 @@ export async function findNewLeads() {
     const summary = [];
 
     for (const campaign of campaigns) {
-        if (!campaign.searchQuery) continue;
+        const c = campaign as any;
+        if (!c.searchQuery) continue;
 
         try {
             // Parse query: "electrician in Dayton, OH"
-            let keyword = campaign.searchQuery;
+            let keyword = c.searchQuery;
             let location = "United States";
 
-            if (campaign.searchQuery.includes(" in ")) {
-                const parts = campaign.searchQuery.split(" in ");
+            if (c.searchQuery.includes(" in ")) {
+                const parts = c.searchQuery.split(" in ");
                 keyword = parts[0];
                 location = parts[1];
-            } else if (campaign.searchQuery.includes(",")) {
-                const parts = campaign.searchQuery.split(",");
+            } else if (c.searchQuery.includes(",")) {
+                const parts = c.searchQuery.split(",");
                 keyword = parts[0];
                 location = parts.slice(1).join(",").trim();
             }

@@ -63,6 +63,60 @@ export class MockLeadFinder implements LeadFinder {
                 email: "sales@advanceelectric.com", // Guessed/Mock
                 source: "MockFinder",
             },
+            {
+                name: "Director",
+                company: "Advanced Electric Design",
+                email: "director@advancedelectricdesign.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Team",
+                company: "Affordable Electric",
+                email: "team@affordableelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Contact",
+                company: "All Star Electric",
+                email: "contact@allstarelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Admin",
+                company: "Allied Electric",
+                email: "admin@alliedelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Manager",
+                company: "Alpha Electric",
+                email: "manager@alphaelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Support",
+                company: "American Electric",
+                email: "support@americanelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Sales",
+                company: "Apex Electric",
+                email: "sales@apexelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Info",
+                company: "Applied Electric",
+                email: "info@appliedelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
+            {
+                name: "Service",
+                company: "Arc Electric",
+                email: "service@arcelectric.com", // Guessed/Mock
+                source: "MockFinder",
+            },
         ];
 
         // Return random subset

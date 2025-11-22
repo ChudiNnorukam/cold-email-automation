@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { decrypt } from './crypto';
+import { generateBusinessCard } from './email-components/BusinessCard';
 
 interface SmtpConfig {
   host: string | null;
@@ -12,7 +13,7 @@ interface SmtpConfig {
   fromEmail: string;
 }
 
-interface Lead {
+export interface Lead {
   id: string;
   name: string;
   email: string;
@@ -47,7 +48,7 @@ export async function createTransport(smtpConfig: SmtpConfig): Promise<Transport
  * Escape HTML special characters to prevent XSS attacks
  * Protects against malicious data in lead fields (name, company, email)
  */
-export function renderTemplate(templateText: string, lead: Lead): string {
+export function renderTemplate(templateText: string, lead: Lead, isBody: boolean = false, asHtml: boolean = false): string {
   // 1. Handle Name Edge Cases
   let safeName = lead.name;
   if (!safeName || safeName.toLowerCase().includes('unknown') || safeName.trim() === '') {
@@ -89,11 +90,30 @@ export function renderTemplate(templateText: string, lead: Lead): string {
   // 3. Handle City (if we had a city field, for now fallback)
   const safeCity = "your area";
 
-  return templateText
+  let rendered = templateText
     .replace(/\{\{Name\}\}/g, safeName)
     .replace(/\{\{Company\}\}/g, safeCompany)
     .replace(/\[City\]/g, safeCity)
     .replace(/\{\{Email\}\}/g, lead.email);
+
+  // Append Compliance Footer ONLY for body
+  if (isBody) {
+    // Wait, I can't make renderTemplate async easily without breaking callers.
+    // I will assume the import is added.
+
+    if (asHtml) {
+      // Convert newlines to <br> for HTML body
+      // Handle both \r\n and \n
+      rendered = rendered.replace(/\r\n/g, '\n');
+      rendered = rendered.replace(/\n/g, '<br>');
+      // Append HTML Business Card
+      rendered += generateBusinessCard(lead);
+    } else {
+      return rendered;
+    }
+  }
+
+  return rendered;
 }
 
 export async function sendEmail(
@@ -102,8 +122,16 @@ export async function sendEmail(
   lead: Lead
 ): Promise<void> {
   const transport = await createTransport(config);
-  const body = renderTemplate(template.body, lead);
-  const subject = renderTemplate(template.subject, lead);
+
+  // Generate Plain Text Version
+  const textBody = renderTemplate(template.body, lead, true, false);
+
+  // Generate HTML Version
+  const htmlBody = renderTemplate(template.body, lead, true, true);
+
+  const subject = renderTemplate(template.subject, lead, false, false);
+
+  console.log("DEBUG: HTML Body Preview:\n", htmlBody.substring(0, 200) + "...");
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
 
@@ -114,7 +142,8 @@ export async function sendEmail(
     from: `"${config.fromName}" <${config.fromEmail}>`,
     to: lead.email,
     subject,
-    text: body,
+    text: textBody, // Plain text fallback
+    html: htmlBody, // HTML version
     messageId,
     headers: {
       // Unsubscribe headers (RFC 8058 - required for bulk email)

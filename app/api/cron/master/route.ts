@@ -5,6 +5,11 @@ export const maxDuration = 60; // Vercel Hobby limit is 10s, Pro is 60s. We'll t
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        return new Response('Unauthorized', { status: 401 });
+    }
+
     try {
         console.log("Starting Master Cron Job...");
         const results: any = {};
