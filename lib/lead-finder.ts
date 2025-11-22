@@ -147,7 +147,7 @@ export class GooglePlacesLeadFinder implements LeadFinder {
 
         try {
             while (leads.length < limit) {
-                const apiResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
+                const apiResponse: any = await fetch('https://places.googleapis.com/v1/places:searchText', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
