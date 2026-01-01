@@ -1,111 +1,89 @@
-export interface HunterEmailResult {
-    email: string;
-    score: number;
-    position?: string;
-    source?: string;
-    domain?: string;
-}
+
+import { z } from 'zod';
+
+const HunterResultSchema = z.object({
+    data: z.object({
+        emails: z.array(z.object({
+            value: z.string().email(),
+            type: z.string(), // "personal" or "generic"
+            confidence: z.number().optional(),
+            first_name: z.string().nullable().optional(),
+            last_name: z.string().nullable().optional(),
+            position: z.string().nullable().optional(),
+        })).optional(),
+        domain: z.string().optional(),
+        organization: z.string().optional(),
+    }).optional(),
+    errors: z.array(z.object({
+        id: z.string(),
+        code: z.number(),
+        details: z.string()
+    })).optional()
+});
+
+export type HunterResult = z.infer<typeof HunterResultSchema>;
 
 export class HunterClient {
     private apiKey: string;
     private baseUrl = 'https://api.hunter.io/v2';
 
-    constructor(apiKey: string) {
-        this.apiKey = apiKey;
-    }
-
-    /**
-     * Find email by Company Name OR Domain
-     */
-    async findEmail(company: string, fullName?: string, domain?: string): Promise<HunterEmailResult | null> {
-        try {
-            const params = new URLSearchParams({
-                api_key: this.apiKey
-            });
-
-            if (domain) {
-                params.append('domain', domain);
-            } else {
-                params.append('company', company);
-            }
-
-            if (fullName) {
-                params.append('full_name', fullName);
-            }
-
-            const url = `${this.baseUrl}/email-finder?${params.toString()}`;
-            console.log(`🏹 Hunter Search: ${domain || company} (${fullName || 'No Name'})`);
-
-            const response = await fetch(url);
-
-            if (response.status === 429) {
-                throw new Error("Hunter API Rate Limit Exceeded");
-            }
-
-            if (!response.ok) {
-                // 400 usually means "Domain not found" or "Invalid Request"
-                // We treat this as "No Email Found" rather than crashing
-                const errorText = await response.text();
-                console.warn(`Hunter API Warning (${response.status}): ${errorText}`);
-                return null;
-            }
-
-            const data = await response.json();
-
-            if (data.data && data.data.email) {
-                return {
-                    email: data.data.email,
-                    score: data.data.score,
-                    position: data.data.position,
-                    source: 'Hunter.io',
-                    domain: data.data.domain
-                };
-            }
-
-            return null;
-
-        } catch (error) {
-            console.error("Hunter API Error:", error);
-            return null;
+    constructor() {
+        this.apiKey = process.env.HUNTER_API_KEY || "";
+        if (!this.apiKey) {
+            console.warn("⚠️ HUNTER_API_KEY is missing. Email enrichment will be skipped.");
         }
     }
 
     /**
-     * Search Domain for ANY email
+     * Find emails for a given domain
      */
-    async searchDomain(domain: string): Promise<HunterEmailResult | null> {
+    async findEmails(domain: string, companyName?: string): Promise<{ email: string, confidence: number, name?: string } | null> {
+        if (!this.apiKey) return null;
+
         try {
-            const params = new URLSearchParams({
-                api_key: this.apiKey,
-                domain: domain,
-                limit: '1' // We only need one
-            });
-
-            const url = `${this.baseUrl}/domain-search?${params.toString()}`;
-            console.log(`🏹 Hunter Domain Search: ${domain}`);
-
+            const url = `${this.baseUrl}/domain-search?domain=${domain}&api_key=${this.apiKey}&limit=10`;
             const response = await fetch(url);
 
             if (!response.ok) {
+                console.error(`Hunter API Error (${response.status}): ${response.statusText}`);
                 return null;
             }
 
-            const data = await response.json();
+            const json = await response.json();
+            const result = HunterResultSchema.safeParse(json);
 
-            if (data.data && data.data.emails && data.data.emails.length > 0) {
-                const bestEmail = data.data.emails[0];
-                return {
-                    email: bestEmail.value,
-                    score: bestEmail.confidence,
-                    position: bestEmail.position,
-                    source: 'Hunter.io (Domain Search)',
-                    domain: domain
-                };
+            if (!result.success) {
+                console.error("Hunter API Response Validation Failed:", result.error);
+                return null;
             }
 
-            return null;
-        } catch (e) {
-            console.error("Hunter Domain Search Error:", e);
+            const emails = result.data.data?.emails;
+            if (!emails || emails.length === 0) return null;
+
+            // Strategy:
+            // 1. Prefer "generic" emails (info@, contact@) for initial outreach if no specific person targeted?
+            //    Actually, cold email best practice is usually specific person.
+            //    But for this tool, maybe we want "Owner" or "Founder"?
+            //    Hunter returns a list. Let's pick the one with highest confidence.
+
+            // Sort by confidence
+            emails.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+
+            const bestEmail = emails[0];
+
+            let name = undefined;
+            if (bestEmail.first_name && bestEmail.last_name) {
+                name = `${bestEmail.first_name} ${bestEmail.last_name}`;
+            }
+
+            return {
+                email: bestEmail.value,
+                confidence: bestEmail.confidence || 0,
+                name: name
+            };
+
+        } catch (error) {
+            console.error("Hunter API Exception:", error);
             return null;
         }
     }

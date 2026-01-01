@@ -101,10 +101,10 @@ export function renderTemplate(templateText: string, lead: Lead, isBody: boolean
   const safeCity = "your area";
 
   let rendered = templateText
-    .replace(/\{\{Name\}\}/g, safeName)
-    .replace(/\{\{Company\}\}/g, safeCompany || 'your company')
-    .replace(/\[City\]/g, safeCity)
-    .replace(/\{\{Email\}\}/g, lead.email);
+    .replace(/\{\{Name\}\}/gi, safeName)
+    .replace(/\{\{Company\}\}/gi, safeCompany || 'your company')
+    .replace(/\[City\]/gi, safeCity)
+    .replace(/\{\{Email\}\}/gi, lead.email);
 
   // Append Compliance Footer ONLY for body
   if (isBody) {

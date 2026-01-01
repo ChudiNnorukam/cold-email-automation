@@ -12,7 +12,7 @@ const SPAM_TRIGGERS = [
     "multi-level marketing", "name brand", "new customers only", "no catch", "no cost",
     "no credit check", "no fees", "no gimmick", "no hidden costs", "no investment",
     "no obligation", "no purchase necessary", "no questions asked", "no strings attached",
-    "off shore", "offer", "online biz", "online degree", "opportunity", "order now",
+    "off shore", "online biz", "online degree", "opportunity", "order now",
     "passwords", "pharmacy", "please read", "potential earnings", "pre-approved", "prize",
     "promise", "pure profit", "quote", "rates", "refinance", "refund", "remove",
     "request", "risk-free", "satisfaction", "save big", "save money", "score",

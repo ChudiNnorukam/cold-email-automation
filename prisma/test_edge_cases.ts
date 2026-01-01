@@ -6,17 +6,17 @@ const testCases = [
     {
         name: "Standard",
         lead: { id: '1', name: "John", company: "Acme Corp", email: "john@acme.com" },
-        expected: "Hi John, I saw Acme Corp in your area. Contact: john@acme.com"
+        expected: "Hi John, I saw Acme in your area. Contact: john@acme.com"
     },
     {
         name: "Unknown Name",
         lead: { id: '2', name: "Unknown", company: "Acme Corp", email: "info@acme.com" },
-        expected: "Hi there, I saw Acme Corp in your area. Contact: info@acme.com"
+        expected: "Hi there, I saw Acme in your area. Contact: info@acme.com"
     },
     {
         name: "Empty Name",
         lead: { id: '3', name: "", company: "Acme Corp", email: "info@acme.com" },
-        expected: "Hi there, I saw Acme Corp in your area. Contact: info@acme.com"
+        expected: "Hi there, I saw Acme in your area. Contact: info@acme.com"
     },
     {
         name: "Company Suffix (LLC)",

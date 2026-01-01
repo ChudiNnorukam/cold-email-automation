@@ -1,7 +1,12 @@
 import prisma from "@/lib/prisma";
 import { LeadStatus } from "@prisma/client";
 import { sendEmail } from "@/lib/email";
-import { getLeadFinder } from "@/lib/lead-finder";
+import { getLeadFinder, LeadFinder } from "@/lib/lead-finder";
+import { WebSearchLeadFinder } from "@/lib/web-search";
+
+// ... (inside findNewLeads)
+
+
 
 export async function processEmailQueue() {
     const smtpConfig = await prisma.smtpConfig.findFirst();
@@ -253,7 +258,8 @@ export async function findNewLeads() {
         }
     });
 
-    const finder = getLeadFinder();
+    const placesFinder = getLeadFinder('places') as LeadFinder;
+    const webFinder = getLeadFinder('web') as WebSearchLeadFinder;
     const summary = [];
 
     for (const campaign of campaigns) {
@@ -261,22 +267,31 @@ export async function findNewLeads() {
         if (!c.searchQuery) continue;
 
         try {
-            // Parse query: "electrician in Dayton, OH"
-            let keyword = c.searchQuery;
-            let location = "United States";
+            let newLeads: any[] = [];
 
-            if (c.searchQuery.includes(" in ")) {
-                const parts = c.searchQuery.split(" in ");
-                keyword = parts[0];
-                location = parts[1];
-            } else if (c.searchQuery.includes(",")) {
-                const parts = c.searchQuery.split(",");
-                keyword = parts[0];
-                location = parts.slice(1).join(",").trim();
+            // Determine which finder to use
+            if (campaign.name.includes("Portfolio Audit")) {
+                console.log(`Processing Web Search Campaign: ${campaign.name}`);
+                // Web finder expects a single query string, not "keyword in location"
+                newLeads = await webFinder.findLeads(c.searchQuery, 5);
+            } else {
+                // Default to Places finder
+                // Parse query: "electrician in Dayton, OH"
+                let keyword = c.searchQuery;
+                let location = "United States";
+
+                if (c.searchQuery.includes(" in ")) {
+                    const parts = c.searchQuery.split(" in ");
+                    keyword = parts[0];
+                    location = parts[1];
+                } else if (c.searchQuery.includes(",")) {
+                    const parts = c.searchQuery.split(",");
+                    keyword = parts[0];
+                    location = parts.slice(1).join(",").trim();
+                }
+
+                newLeads = await placesFinder.findLeads(keyword, location, 5);
             }
-
-            // Find leads
-            const newLeads = await finder.findLeads(keyword, location, 5); // Limit 5
 
             let added = 0;
             for (const leadData of newLeads) {
@@ -289,6 +304,7 @@ export async function findNewLeads() {
                     const lead = await prisma.lead.create({
                         data: {
                             ...leadData,
+                            notes: `Source: ${leadData.source}`,
                             status: LeadStatus.NEW
                         }
                     });
