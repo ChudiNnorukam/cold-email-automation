@@ -15,7 +15,7 @@ async function sourceLeads() {
         return;
     }
 
-    const finder = getLeadFinder();
+    const finder = getLeadFinder('places');
     const query = campaign.searchQuery || "electrician";
     console.log(`Using query: ${query}`);
 

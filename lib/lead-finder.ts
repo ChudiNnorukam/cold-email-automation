@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { HunterClient } from './hunter';
+import { WebSearchLeadFinder } from './web-search';
 
 export const LeadResultSchema = z.object({
     name: z.string(),
@@ -128,9 +130,11 @@ export class MockLeadFinder implements LeadFinder {
 // Real implementation using Google Places API (New)
 export class GooglePlacesLeadFinder implements LeadFinder {
     private apiKey: string;
+    private hunterClient: HunterClient;
 
     constructor() {
         this.apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_PLACES_API || "";
+        this.hunterClient = new HunterClient();
         if (!this.apiKey) {
             console.warn("⚠️ GOOGLE_PLACES_API_KEY is missing. Falling back to Mock.");
         }
@@ -178,64 +182,55 @@ export class GooglePlacesLeadFinder implements LeadFinder {
                     // Filter: Must be OPERATIONAL
                     if (place.businessStatus !== 'OPERATIONAL') continue;
 
-                    // Filter: Must NOT have a website (for "No Website" campaign)
-                    // Note: The user might want *all* leads, but for this specific campaign we want NO website.
-                    // Let's make this configurable? For now, I'll fetch ALL and let the caller filter?
-                    // Actually, the interface is generic. I should probably return all and let the caller filter.
-                    // BUT, the user specifically asked for "No Website Campaign".
-                    // Let's return the websiteUri so the caller can decide.
-
-                    // Wait, the caller (cron job) expects "LeadResult".
-                    // LeadResult has optional website.
-
-                    // For the purpose of "finding leads", we should try to find an email.
-                    // Google Places DOES NOT provide emails.
-                    // We will have to mark email as "unknown" or generate a placeholder?
-                    // The User's prompt implies we *have* emails.
-                    // "generate 50 qualified leads... and send queue"
-                    // If I return "unknown@example.com", the email sender will fail.
-
-                    // CRITICAL: We cannot send emails if we don't have them.
-                    // I will generate a placeholder email `info@[sanitized_company_name].com` 
-                    // and mark it as "UNVERIFIED" in notes?
-                    // Or should I just skip them?
-
-                    // Let's be honest with the user. I will return the lead.
-                    // The email field is required in LeadResultSchema.
-                    // I will try to construct a likely email or leave it empty (if schema allowed, but it's z.string().email()).
-                    // I'll use a placeholder `missing_email_[random]@placeholder.com` so we can identify them.
-
                     const name = place.displayName?.text || "Unknown";
                     const company = place.displayName?.text || "Unknown";
                     const website = place.websiteUri;
-                    const address = place.formattedAddress;
-
-                    // Heuristic: If no website, we definitely don't have a domain to guess email from.
-                    // If they have a website, we could guess `info@domain.com`.
 
                     let email = `missing_email_${Date.now()}_${Math.random().toString(36).substring(7)}@placeholder.com`;
+                    let source = "GooglePlaces";
+                    let contactName = "Owner";
+
+                    // --- ENRICHMENT: Hunter.io ---
+                    if (website) {
+                        try {
+                            // Extract domain
+                            const domain = new URL(website).hostname.replace('www.', '');
+                            console.log(`   🔎 Enriching ${company} (${domain})...`);
+
+                            const hunterResult = await this.hunterClient.findEmails(domain, company);
+
+                            if (hunterResult) {
+                                email = hunterResult.email;
+                                source = "GooglePlaces+Hunter";
+                                if (hunterResult.name) {
+                                    contactName = hunterResult.name;
+                                }
+                                console.log(`      ✅ Found email: ${email} (Confidence: ${hunterResult.confidence}%)`);
+                            } else {
+                                console.log(`      ❌ No email found for ${domain}`);
+                            }
+                        } catch (e) {
+                            console.error(`      ⚠️ Failed to enrich ${company}:`, e);
+                        }
+                    }
 
                     leads.push({
-                        name: "Owner", // Generic name since we don't have contact name
+                        name: contactName,
                         company: company,
                         email: email,
                         website: website,
-                        source: "GooglePlaces",
-                        // We can add address to notes later if needed
+                        source: source,
                     });
                 }
 
                 nextPageToken = data.nextPageToken;
                 if (!nextPageToken) break;
 
-                // Google requires a short delay before using the next page token? 
-                // v1 API might not, but legacy did. Let's be safe.
                 await new Promise(r => setTimeout(r, 2000));
             }
 
         } catch (error) {
             console.error("Failed to fetch from Google Places:", error);
-            // Fallback to mock if API fails? No, better to throw or return partial.
         }
 
         return leads;
@@ -243,7 +238,12 @@ export class GooglePlacesLeadFinder implements LeadFinder {
 }
 
 // Factory to get the appropriate finder
-export function getLeadFinder(): LeadFinder {
+export function getLeadFinder(type: 'web'): WebSearchLeadFinder;
+export function getLeadFinder(type?: 'places'): LeadFinder;
+export function getLeadFinder(type: 'places' | 'web' = 'places') {
+    if (type === 'web') {
+        return new WebSearchLeadFinder();
+    }
     // Check env vars to decide which implementation to use
     if (process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_PLACES_API) {
         return new GooglePlacesLeadFinder();

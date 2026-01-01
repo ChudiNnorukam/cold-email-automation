@@ -51,7 +51,7 @@ Chudi Nnorukam`
     console.log(`✅ Using Campaign: ${campaign.name}`);
 
     // 2. Find Leads
-    const finder = getLeadFinder();
+    const finder = getLeadFinder('places');
     const queries = ["electrician", "plumber", "roofer", "hvac"];
     const locations = ["San Francisco, CA", "Los Angeles, CA", "New York, NY", "Chicago, IL", "Houston, TX"];
 

@@ -13,7 +13,7 @@ async function enrichLeads() {
         process.exit(1);
     }
 
-    const hunter = new HunterClient(apiKey);
+    const hunter = new HunterClient();
 
     // 1. Find Leads with Placeholder Emails AND Website
     const leads = await prisma.lead.findMany({
@@ -69,17 +69,17 @@ async function enrichLeads() {
         // I'll just try to pass the domain as the company name. Hunter often resolves it.
         // OR, I can update the client in the next step.
         // Use Domain Search
-        const result = await hunter.searchDomain(domain);
+        const result = await hunter.findEmails(domain, lead.company ?? undefined);
 
         if (result) {
-            console.log(`✅ Found Email for ${lead.company}: ${result.email} (Score: ${result.score})`);
+            console.log(`✅ Found Email for ${lead.company}: ${result.email} (Confidence: ${result.confidence}%)`);
 
             // Update Lead
             await prisma.lead.update({
                 where: { id: lead.id },
                 data: {
                     email: result.email,
-                    notes: `${lead.notes || ''}\n[Enriched] Email found via Hunter.io (Score: ${result.score}, Domain: ${result.domain})`
+                    notes: `${lead.notes || ''}\n[Enriched] Email found via Hunter.io (Confidence: ${result.confidence}%, Domain: ${domain})`
                 }
             });
             enrichedCount++;
